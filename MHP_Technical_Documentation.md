@@ -131,12 +131,6 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ### 4.2 Non-Functional Requirements
 
-**NFR1: Performance**
-- NFR1.1: API response time must be <200ms for 95% of requests
-- NFR1.2: Dashboard load time must be <2 seconds on standard network
-- NFR1.3: System must handle 100 concurrent users without degradation
-- NFR1.4: Cron job execution must complete within 30 seconds
-
 **NFR2: Security**
 - NFR2.1: All passwords must be hashed using bcrypt (salt rounds ≥10)
 - NFR2.2: JWT tokens must be stored in HTTP-only cookies
@@ -144,12 +138,12 @@ The organization currently uses an Excel-based system to track daily meal headco
 - NFR2.4: System must validate user permissions on every request
 
 **NFR3: Reliability**
-- NFR3.1: System uptime must be ≥99% during business hours (8 AM - 6 PM)
+- NFR3.1: System uptime must be ≥99%
 - NFR3.2: Cron job failures must not prevent manual system use
 - NFR3.3: System must gracefully handle database connection failures
 
 **NFR4: Usability**
-- NFR4.1: Employees must be able to update meals with ≤3 clicks
+- NFR4.1: Employees must be able to update meals with minimum clicks
 - NFR4.2: UI must provide immediate visual feedback for all actions
 - NFR4.3: Error messages must be clear and actionable
 
@@ -225,7 +219,6 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 **Trade-off:**
 - Requires `.js` extensions in import statements (TypeScript quirk)
-- Some older libraries may have compatibility issues (minimal in 2025)
 
 ---
 
