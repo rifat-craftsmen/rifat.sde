@@ -1,4 +1,8 @@
-# Meal Headcount Planner (MHP) - Technical Design Document
+## Meal Headcount Planner Technical Design Document
+- Author: Rifat Ahmed
+- Iteration: 1
+- Version: v3
+- Status: In Review
 
 ---
 
@@ -112,6 +116,8 @@ The organization currently uses an Excel-based system to track daily meal headco
 - FR4.4: Admins must be able to set occasion names (e.g., "Company Annual Celebration")
 - FR4.5: Admins must have full system access without team restrictions
 
+
+
 **FR5: Logistics Reporting**
 - FR5.1: Logistics team must be able to view daily headcount for all meal types
 - FR5.2: Logistics team must be able to select any date for historical reporting
@@ -128,6 +134,22 @@ The organization currently uses an Excel-based system to track daily meal headco
 - FR7.1: System must prevent duplicate meal records per user per date
 - FR7.2: System must maintain audit metadata (lastModifiedBy, timestamps)
 - FR7.3: System must preserve user preferences even when created days in advance
+
+
+**FR8: User Management (Admin)**
+FR8.1: Admins must be able to create new user accounts
+FR8.2: User creation form must include:
+- Name (required)
+- Email (required, unique)
+- Role (required, dropdown: EMPLOYEE, LEAD, ADMIN, LOGISTICS)
+- Team (optional)
+- Initial password (auto-generated or admin-provided)
+
+FR8.3: System must hash passwords before storing in database
+FR8.4: System must display generated password and admin will share it with new user
+FR8.5: [Future Enhancement] System should send welcome email with password reset link to new users mail where he can set new password 
+FR8.6: Admins must be able to deactivate and delete users 
+FR8.7: Inactive users must not appear in meal planning.
 
 ### 4.2 Non-Functional Requirements
 
@@ -215,10 +237,6 @@ The organization currently uses an Excel-based system to track daily meal headco
 2. **Prisma Compatibility**: Prisma works seamlessly with ES Modules
 3. **TypeScript Alignment**: TypeScript's module resolution works better with ESM
 4. **Future-Proof**: All new Node.js features are ESM-first
-5. **Tree-Shaking**: Better dead code elimination in production builds
-
-**Trade-off:**
-- Requires `.js` extensions in import statements (TypeScript quirk)
 
 ---
 
@@ -339,31 +357,50 @@ The organization currently uses an Excel-based system to track daily meal headco
 **Goal:** Create meal records for tomorrow for all active employees
 
 **Steps:**
-1. **Trigger**: System clock reaches 9 PM server time
+
+1. **Trigger**: System clock reaches 09:00 PM server time 
+
 2. **Calculate Date**: Determine tomorrow's date (e.g., Feb 7)
-3. **Fetch Active Users**: Query database for all users with status = ACTIVE (returns 105 users)
+
+3. **Fetch Active Users**: Query database for all users with status = ACTIVE (e.g. returns 105 users)
+
 4. **Check Schedule**:
    - Query MealSchedule table for Feb 7
-   - If found: Use configured meal flags
-   - If not found: Use defaults (Lunch=true, Snacks=true, others=false)
+   - If found: Use configured meals by admin as defaults (e.g. Lunch=true, Snacks=false, Iftar=true, others=null)
+   - If not found: Use system defaults (Lunch=true, Snacks=true, others=null)
+
 5. **For Each User**:
-   - Check if MealRecord exists for userId + Feb 7
-   - **If exists**: Skip (user already created their own record)
-   - **If not exists**: Create new MealRecord with:
-     - userId = user.id
-     - date = Feb 7
-     - meal flags = from schedule/defaults
-     - lastModifiedBy = null (system-generated)
-     - notificationSent = false
+   - Check if MealRecord exists for `userId + Feb 7`
+   
+   **If record does NOT exist:**
+   - Create new MealRecord with meal defaults coming from step 4 
+   - Set lastModifiedBy = null (system-generated)
+   - Set notificationSent = false
+   
+   **If record DOES exist:**
+   - For each meal column (lunch, snacks, iftar, eventDinner, optionalDinner):
+     - **If column is `null`**: Apply values from meal defaults coming from step 4
+     - **If column is `true` or `false`**: Skip (preserve user's explicit decision)
+
 6. **Log Results**:
    - Created 82 new records
-   - Skipped 23 users (already have records)
-7. **Complete**: Job finishes in ~5 seconds
+   - Updated 15 records with new special events (only `null` columns)
+   - Skipped 23 users (all meals already decided, no `null` values)
+
+7. **Special Case**: 
+    - When a user dont want to participate in any meals including special ones, he can click **All meals off** button, it will create a row where for all mealtypes value will be false.
+    - Any special occasion (even those occassions added after his selection) will be ignored during cron jobs.
+
 
 **Edge Cases Handled:**
-- If cron fails, employees can still manually add records
-- Duplicate prevention via unique constraint (userId + date)
-- Transaction rollback if bulk insert fails
+  - If cron fails, employees can still manually add records
+  - Duplicate prevention via unique constraint (userId + date)
+  - Transaction rollback if bulk insert fails
+  - Special events added after user's meal selection are handled gracefully via three-state nullable boolean pattern.
+
+
+
+
 
 ---
 
@@ -489,8 +526,12 @@ The organization currently uses an Excel-based system to track daily meal headco
 **User Table:**
 - Stores employee information and credentials
 - Fields: id, name, email, password (hashed), role (EMPLOYEE/LEAD/ADMIN/LOGISTICS), status (ACTIVE/INACTIVE), teamId
+- Password Management: Passwords hashed with bcrypt before storage  
+- Account Creation: New users created by Admin with auto-generated or custom password
+- Future Enhancement: Password reset via email link (requires notification system)
 - Single role per user (no combined roles)
-- Status field enables soft deletion (preserves historical data)
+- If User is deactivated via status = INACTIVE, it will preserves historical data
+- If a user is permanently deleted, it does not preserves historical data.
 - Team assignment enables Team Lead access control
 
 **Team Table:**
@@ -526,9 +567,9 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 | Method | Endpoint | Role | Description |
 |--------|----------|------|-------------|
-| POST | `/api/auth/login` | Public | Login with email/password |
+| POST | `/api/auth/login` | All | Login with email/password |
 | POST | `/api/auth/logout` | All | Clear authentication cookie |
-| GET | `/api/auth/me` | All | Get current user profile |
+| GET | `/api/auth/me` | All | Get current users profile |
 | GET | `/api/meals/my-schedule` | Employee+ | Get 7-day meal grid |
 | PATCH | `/api/meals/my-record` | Employee+ | Add/update own meals |
 | GET | `/api/meals/my-stats` | Employee+ | Get monthly consumption |
@@ -537,9 +578,14 @@ The organization currently uses an Excel-based system to track daily meal headco
 | PATCH | `/api/admin/employee/:userId/record` | Lead+ | Proxy edit employee meals |
 | GET | `/api/admin/employees` | Admin | Search all employees |
 | POST | `/api/admin/meal-schedule` | Admin | Create special occasion |
-| GET | `/api/admin/meal-schedule` | Admin | Get schedule for date |
+| GET | `/api/admin/meal-schedule/today` | Admin | Get all schedules for today |
+| GET | `/api/admin/meal-schedule/:id` | Admin | Get a specific schedule exception |
 | DELETE | `/api/admin/meal-schedule/:id` | Admin | Remove schedule exception |
 | GET | `/api/admin/headcount` | Admin, Logistics | Get daily headcount |
+| POST   | `/api/admin/users`            | Admin | Create new user account |
+| PATCH  | `/api/admin/users/:userId`    | Admin | Update user details (name, role, team, status) |
+| GET    | `/api/admin/users/:userId`    | Admin | Get user details |
+| DELETE | `/api/admin/users/:userId`    | Admin | Delete a user account |
 
 **Sample Request/Response:**
 
@@ -577,30 +623,60 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ```
 App
-├── AuthProvider (Context)
+├── AuthProvider
 │   └── ProtectedRoute
 │       ├── EmployeeDashboard
 │       │   ├── MonthlyStatsCard
 │       │   ├── SevenDayGrid
-│       │   │   └── DayRow
-│       │   │       └── MealCheckbox
-│       │   └── AddFutureMealModal
+│       │       └── DayRow
+│       │           ├── MealCheckbox
+│       │           └── AllOffButton
+│       │
 │       ├── TeamLeadDashboard
 │       │   ├── TeamMemberSearch
 │       │   ├── TeamMemberList
 │       │   │   └── MemberCard
 │       │   └── EmployeeEditModal
-│       │       └── SevenDayGrid (reused)
+│       │       └── SevenDayGrid 
+│       │           └── DayRow 
+│       │           └── AllOffButton
+│       │
 │       ├── AdminDashboard
-│       │   ├── EmployeeSearchBar
-│       │   ├── ScheduleManagementPanel
-│       │   │   └── CreateScheduleForm
-│       │   └── SystemStats
+│       │   ├── Tabs
+│       │   │   ├── UserManagementTab
+│       │   │   │   ├── CreateUserButton → CreateUserModal
+│       │   │   │   │   └── UserForm
+│       │   │   │   ├── UserListTable
+│       │   │   │   │   └── UserRow
+│       │   │   │   │       ├── EditButton → EditUserModal
+│       │   │   │   │       ├── DeactivateButton
+│       │   │   │   │       └── DeleteButton (soft delete)
+│       │   │   │   └── BulkActionsToolbar
+│       │   │   │
+│       │   │   ├── ScheduleManagementTab
+│       │   │   │   ├── CreateScheduleButton → CreateScheduleModal
+│       │   │   │   │   └── ScheduleForm
+│       │   │   │   ├── ScheduleListTable
+│       │   │   │   │   └── ScheduleRow
+│       │   │   │   │       ├── EditButton → EditScheduleModal
+│       │   │   │   │       └── DeleteButton
+│       │   │   │   └── UpcomingEventList
+│       │   │   │
+│       │   │   ├── EmployeeProxyTab
+│       │   │   │   ├── EmployeeSearchBar
+│       │   │   │   ├── EmployeeListTable
+│       │   │   │   └── EmployeeEditModal 
+│       │   │   │
+│       │   │   └── HeadcountReportsTab
+│       │   │       ├── DatePicker
+│       │   │       ├── HeadcountCards
+│       │   │
+│       │   └── SystemStats (Dashboard overview)
+│       │
 │       └── LogisticsDashboard
 │           ├── DatePicker
 │           ├── HeadcountCards
-│           │   └── HeadcountCard
-│           └── ExportButton
+│
 └── LoginPage
     └── LoginForm
 ```
@@ -836,10 +912,6 @@ Client → authenticate() → requireRole(['LEAD', 'ADMIN']) → requireTeamAcce
 - No raw SQL string concatenation
 - Type-safe query builder prevents injection
 
-**XSS Prevention:**
-- **React**: Automatic escaping of rendered content
-- **Input sanitization**: express-validator sanitizes input strings
-- **Output encoding**: All API responses JSON-encoded
 
 ### 9.5 Data Privacy
 
@@ -1016,106 +1088,113 @@ describe('POST /api/meals/my-record', () => {
 });
 ```
 
-### 10.3 End-to-End Testing
+### 10.3 Manual Testing
 
-**Scope:** Full user workflows in browser environment
+#### A. Employee Checklist
 
-**Tools:**
-- **Framework**: Playwright or Cypress
-- **Coverage**: Critical user journeys
+**Authentication & Access**
+-  Employee can log in with valid credentials.
+-  Invalid login returns proper error message.
+-  Employee cannot access Admin/Lead/Logistics endpoints (403).
+-  Session persists correctly for configured duration.
+-  Logout clears authentication cookie.
 
-**Test Scenarios:**
-
-**A. Employee Complete Flow**
-1. Navigate to login page
-2. Enter credentials and submit
-3. Verify dashboard loads with 7-day grid
-4. Uncheck "Lunch" for tomorrow
-5. Verify visual feedback (checkmark → unchecked)
-6. Refresh page
-7. Verify change persisted
-
-**B. Team Lead Proxy Edit Flow**
-1. Login as Team Lead
-2. Search for team member
-3. Click on member card
-4. Modal opens with member's schedule
-5. Modify meals for tomorrow
-6. Save changes
-7. Verify success message
-8. (Future) Verify employee sees "Modified by [Lead Name]" badge
-
-**C. Admin Schedule Creation Flow**
-1. Login as Admin
-2. Navigate to Schedule Management
-3. Click "Create Special Occasion"
-4. Fill form with event details
-5. Submit
-6. Verify schedule appears in list
-7. Logout and login as Employee
-8. Verify special meal appears in employee's grid with occasion badge
-
-### 10.4 Performance Testing
-
-**Scope:** Load and response time validation
-
-**Tools:**
-- **API Load Testing**: Artillery or k6
-- **Browser Performance**: Lighthouse
-
-**Test Scenarios:**
-
-**A. Concurrent User Load**
-- Simulate 100 users logging in simultaneously
-- Target: <200ms API response time for 95th percentile
-- Target: No database connection pool exhaustion
-
-**B. Cron Job Performance**
-- Measure execution time for creating 100 users × 1 day of records
-- Target: <30 seconds total execution
-- Verify no database locks during execution
-
-**C. Headcount Query Performance**
-- Query headcount for date with 100 meal records
-- Target: <100ms response time
-- Test with database indexes enabled vs disabled
-
-**D. Frontend Performance**
-- Measure Time to Interactive (TTI) on Employee Dashboard
-- Target: <2 seconds on 3G network
-- Lighthouse score target: >90
-
-### 10.5 Security Testing
-
-**Scope:** Vulnerability and penetration testing
-
-**Test Areas:**
-
-**A. Authentication Bypass**
-- Attempt to access protected endpoints without JWT
-- Attempt to forge JWT with invalid signature
-- Attempt to use expired JWT
-
-**B. Authorization Bypass**
-- Attempt Team Lead accessing other team's data
-- Attempt Employee accessing admin endpoints
-- Attempt Logistics editing meal records
-
-**C. Input Validation**
-- SQL injection attempts in email/search fields
-- XSS attempts in occasion name fields
-- Invalid date formats in API requests
-
-**D. CSRF Protection**
-- Attempt cross-site request without proper headers
-- Verify SameSite cookie attribute blocks attacks
-
-**E. Rate Limiting**
-- Attempt >5 login attempts in 15 minutes
-- Verify account lockout or delay
+**Meal Viewing & Selection**
+-  Employee can view 7-day meal grid.
+-  Today's meals cannot be edited.
+-  Only valid planning window (tomorrow → next 6 days) is editable.
+-  Only meal types defined in `meal_schedule` appear for selected date.
+-  Default meals (Lunch, Snacks) appear when no special schedule exists.
+-  Special events appear when scheduled.
+-  Employee can toggle individual meal types.
+-  Selection creates or updates a MealRecord correctly.
+-  “All Off” sets all meal columns to `false`.
+-  UI reflects saved state immediately.
+-  Invalid payload (wrong date/format) shows proper error.
 
 
----
+
+#### B. Team Lead Checklist
+
+**Access Scope**
+-  Lead can log in and access Lead dashboard.
+-  Lead can view only their assigned team members.
+-  Lead cannot access members from other teams.
+-  Direct API access to another team’s member returns 403.
+
+**Proxy Meal Management**
+-  Lead can open a team member’s meal schedule.
+-  Lead can update team member meal selections.
+-  Proxy update respects date window rules.
+-  Proxy edit correctly sets `lastModifiedBy` to Lead ID.
+-  “All Off” works correctly in proxy mode.
+-  Special events appear correctly in member view.
+-  Changes are reflected in headcount reporting.
+
+
+
+#### C. Admin Checklist
+
+**User Management**
+-  Admin can create new user with valid data.
+-  Required fields validation works.
+-  Duplicate email creation is prevented.
+-  Admin can update user details (name, role, team, status).
+-  Admin can deactivate user (status = INACTIVE).
+-  Inactive users do not appear in meal planning.
+-  Admin can delete user.
+-  Deleted user cannot log in.
+
+**Schedule Management**
+-  Admin can create MealSchedule for a date.
+-  Admin can enable/disable specific meal types.
+-  Admin can set occasion name.
+-  Schedule changes reflect in UI immediately.
+-  Admin can delete schedule exception.
+-  System falls back to default meals when schedule is removed.
+
+**Global Permissions**
+-  Admin can access all employees across teams.
+-  Admin can proxy edit any employee.
+-  Admin-only endpoints are blocked for non-admin roles.
+
+
+
+#### D. Logistics Checklist
+
+**Reporting Access**
+-  Logistics can log in and access reporting dashboard.
+-  Logistics can view daily headcount.
+-  Logistics can select historical dates.
+-  Headcount values are accurate per meal type.
+-  Logistics cannot edit meals.
+-  Logistics cannot access user management endpoints.
+
+
+#### E. System & Automation Checklist
+
+**Cron Job Behavior**
+-  Cron creates MealRecord if none exists.
+-  Cron does not overwrite `true` or `false` values.
+-  Cron updates only `null` columns.
+-  Cron applies MealSchedule rules when present.
+-  Cron uses default rules when no schedule exists.
+-  No duplicate records are created.
+-  Cron handles special event added after user selection correctly.
+-  “All Off” records remain unchanged after cron.
+-  Cron execution is logged.
+
+
+
+#### F. Data Integrity & Edge Cases
+
+-  Unique constraint prevents duplicate (userId + date).
+-  Invalid `userId` returns proper error.
+-  Invalid date format returns 400.
+-  System handles concurrent updates safely.
+-  Deactivated users are excluded from cron processing.
+-  Headcount excludes inactive and deleted users.
+
 
 ## 11. Operations
 
@@ -1343,34 +1422,18 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 
 ## 13. Success Metrics and KPIs
 
-### 13.1 Launch Success Criteria (Week 1)
+### 13.1 Launch Success Criteria
 
 - **Adoption**: ≥80% of employees create accounts and use system daily
 - **Accuracy**: Headcount variance ≤1% compared to actual attendance
-- **Performance**: 95th percentile API response time <200ms
 - **Stability**: Zero critical bugs causing system downtime
 
-### 13.2 Ongoing Metrics (Monthly)
-
-**Operational Efficiency:**
+### 13.2 Ongoing Success Metrics 
 - Logistics team time savings: Target 90% time saving (from hours to minutes)
 - Headcount availability time: Target <5 minutes after 9 PM cutoff
 - Cron job success rate: Target >99%
-
-**User Engagement:**
-- Daily active users: Target ≥90% of active employees
 - Average time to update meals: Target <30 seconds per user
-- Proxy edit frequency: Track (baseline for notification priority)
-
-**Data Quality:**
-- Headcount accuracy: Target <2% variance from actual attendance
-- Last-minute changes: Track (measure cutoff effectiveness)
-- Food waste reduction: Target 20% decrease in over-ordering
-
-**System Performance:**
 - API uptime: Target ≥99% during business hours
-- Average response time: Target <150ms
-- Database query time: Target <50ms
 
 ---
 
