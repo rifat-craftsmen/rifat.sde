@@ -206,7 +206,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 **Decision Rationale:**
 1. **No Infrastructure Overhead**: No need to manage local PostgreSQL or Docker containers
 2. **Team Accessibility**: All developers can access the same database instance for collaboration
-3. **Free Tier Sufficient**: Enough storage to handl 100-500 employees with their historical data
+3. **Free Tier Sufficient**: Enough storage to handle 100-500 employees with their historical data
 4. **Production-Ready**: Same database can be used from development to production
 5. **Automatic Backups**: Neon provides automated daily backups
 6. **Connection Pooling**: Built-in pgBouncer reduces connection overhead
@@ -226,17 +226,6 @@ The organization currently uses an Excel-based system to track daily meal headco
 4. **Team Collaboration**: Self-documenting code with explicit types
 5. **Scalability**: Easier to refactor as codebase grows
 
-### 5.4 Why ES Modules (Not CommonJS)?
-
-**Decision:**
-- Use ES Modules (`import/export`) with `"type": "module"` in package.json
-- TypeScript compiles to ES2020 module format
-
-**Rationale:**
-1. **Modern Standard**: ES Modules are the JavaScript standard (CommonJS is legacy)
-2. **Prisma Compatibility**: Prisma works seamlessly with ES Modules
-3. **TypeScript Alignment**: TypeScript's module resolution works better with ESM
-4. **Future-Proof**: All new Node.js features are ESM-first
 
 ---
 
