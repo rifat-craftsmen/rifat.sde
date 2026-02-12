@@ -137,19 +137,19 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 
 **FR8: User Management (Admin)**
-FR8.1: Admins must be able to create new user accounts
-FR8.2: User creation form must include:
-- Name (required)
-- Email (required, unique)
-- Role (required, dropdown: EMPLOYEE, LEAD, ADMIN, LOGISTICS)
-- Team (optional)
-- Initial password (auto-generated or admin-provided)
+- FR8.1: Admins must be able to create new user accounts
+- FR8.2: User creation form must include:
+  - Name (required)
+  - Email (required, unique)
+  - Role (required, dropdown: EMPLOYEE, LEAD, ADMIN, LOGISTICS)
+  - Team (optional)
+  - Initial password (auto-generated or admin-provided)
 
-FR8.3: System must hash passwords before storing in database
-FR8.4: System must display generated password and admin will share it with new user
-FR8.5: [Future Enhancement] System should send welcome email with password reset link to new users mail where he can set new password 
-FR8.6: Admins must be able to deactivate and delete users 
-FR8.7: Inactive users must not appear in meal planning.
+- FR8.3: System must hash passwords before storing in database
+- FR8.4: System must display generated password and admin will share it with new user
+- FR8.5: [Future Enhancement] System should send welcome email with password reset link to new users mail where he can set new - password 
+- FR8.6: Admins must be able to deactivate and delete users 
+- FR8.7: Inactive users must not appear in meal planning.
 
 ### 4.2 Non-Functional Requirements
 
