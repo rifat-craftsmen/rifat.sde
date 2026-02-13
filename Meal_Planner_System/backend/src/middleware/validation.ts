@@ -37,3 +37,21 @@ export const scheduleValidation = [
   body('isOfficeClosed').isBoolean(),
   validateRequest,
 ];
+
+export const userCreationValidation = [
+  body('name').notEmpty().withMessage('Name is required'),
+  body('email').isEmail().withMessage('Valid email required'),
+  body('role').isIn(['EMPLOYEE', 'LEAD', 'ADMIN', 'LOGISTICS']).withMessage('Valid role required'),
+  body('teamId').optional().isInt().withMessage('Team ID must be a number'),
+  body('password').optional().isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  validateRequest,
+];
+
+export const userUpdateValidation = [
+  body('name').optional().notEmpty().withMessage('Name cannot be empty'),
+  body('email').optional().isEmail().withMessage('Valid email required'),
+  body('role').optional().isIn(['EMPLOYEE', 'LEAD', 'ADMIN', 'LOGISTICS']).withMessage('Valid role required'),
+  body('teamId').optional(),
+  body('status').optional().isIn(['ACTIVE', 'INACTIVE']).withMessage('Valid status required'),
+  validateRequest,
+];

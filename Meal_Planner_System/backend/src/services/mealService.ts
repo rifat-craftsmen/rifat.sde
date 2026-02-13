@@ -1,11 +1,12 @@
+import { startOfDay } from 'date-fns';
 import { prisma } from '../config/prismaClient.js';
 import { formatDateForDB, isDateInValidWindow, getValidDateRange, getCurrentMonthRange } from '../utils/dateHelpers';
 import { MealUpdateData } from '../types';
 
 // Get user's 7-day schedule
-export const getMySchedule = async (userId: number, startDate: Date) => {
+export const getMySchedule = async (userId: number, startDate?: Date) => {
   const { start, end } = getValidDateRange();
-  
+
   // Get meal records for the valid window
   const records = await prisma.mealRecord.findMany({
     where: {
@@ -29,7 +30,9 @@ export const getMySchedule = async (userId: number, startDate: Date) => {
   });
 
   // Build 7-day grid
-  const days = [];
+  const scheduleArray = [];
+  const today = startOfDay(new Date());
+
   for (let i = 0; i < 7; i++) {
     const currentDate = new Date(start);
     currentDate.setDate(currentDate.getDate() + i);
@@ -38,37 +41,42 @@ export const getMySchedule = async (userId: number, startDate: Date) => {
     const record = records.find((r) => r.date.getTime() === formattedDate.getTime());
     const schedule = schedules.find((s) => s.date.getTime() === formattedDate.getTime());
 
-    days.push({
-      date: formattedDate,
-      lunch: record?.lunch ?? true,
-      snacks: record?.snacks ?? true,
-      iftar: record?.iftar ?? false,
-      eventDinner: record?.eventDinner ?? false,
-      optionalDinner: record?.optionalDinner ?? false,
-      lunchAvailable: schedule?.lunchEnabled ?? true,
-      snacksAvailable: schedule?.snacksEnabled ?? true,
-      iftarAvailable: schedule?.iftarEnabled ?? false,
-      eventDinnerAvailable: schedule?.eventDinnerEnabled ?? false,
-      optionalDinnerAvailable: schedule?.optionalDinnerEnabled ?? false,
-      occasionName: schedule?.occasionName,
-      recordExists: !!record,
+    scheduleArray.push({
+      date: formattedDate.toISOString(),
+      isToday: formattedDate.getTime() === today.getTime(),
+      isPast: formattedDate.getTime() < today.getTime(),
+      record: {
+        lunch: record?.lunch ?? true,
+        snacks: record?.snacks ?? true,
+        iftar: record?.iftar ?? false,
+        eventDinner: record?.eventDinner ?? false,
+        optionalDinner: record?.optionalDinner ?? false,
+      },
+      schedule: {
+        lunchEnabled: schedule?.lunchEnabled ?? true,
+        snacksEnabled: schedule?.snacksEnabled ?? true,
+        iftarEnabled: schedule?.iftarEnabled ?? false,
+        eventDinnerEnabled: schedule?.eventDinnerEnabled ?? false,
+        optionalDinnerEnabled: schedule?.optionalDinnerEnabled ?? false,
+        occasionName: schedule?.occasionName,
+      },
     });
   }
 
-  return { days };
+  return { schedule: scheduleArray };
 };
 
 // Add or update meal record
 export const addOrUpdateMealRecord = async (
   userId: number,
-  data: MealUpdateData,
+  data: MealUpdateData,  // this will be an object with 5 types
   modifiedBy?: number
 ) => {
   const targetDate = formatDateForDB(new Date(data.date));
 
   // Validate date is in valid window
   if (!isDateInValidWindow(targetDate)) {
-    throw new Error('Can only add/edit meals for tomorrow through next 6 days');
+    throw new Error('Can only add/edit meals for next 7 days');
   }
 
   // Get meal schedule for this date (if exists)
@@ -102,7 +110,7 @@ export const addOrUpdateMealRecord = async (
         eventDinner: data.eventDinner,
         optionalDinner: data.optionalDinner,
         lastModifiedBy: modifiedBy || null,
-        notificationSent: modifiedBy ? false : true, // Set false if modified by others
+        notificationSent: false,
       },
     });
   } else {
@@ -117,11 +125,14 @@ export const addOrUpdateMealRecord = async (
         eventDinner: data.eventDinner,
         optionalDinner: data.optionalDinner,
         lastModifiedBy: modifiedBy || null,
-        notificationSent: modifiedBy ? false : true,
+        notificationSent: false,
       },
     });
   }
 };
+
+
+
 
 // Get monthly stats
 export const getMyStats = async (userId: number) => {
