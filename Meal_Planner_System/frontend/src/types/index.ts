@@ -98,9 +98,9 @@ export interface CreateScheduleData {
 
 export interface UpdateMealData {
     date: string;
-    lunch: boolean;
-    snacks: boolean;
-    iftar: boolean;
-    eventDinner: boolean;
-    optionalDinner: boolean;
+    lunch: boolean | null;
+    snacks: boolean | null;
+    iftar: boolean | null;
+    eventDinner: boolean | null;
+    optionalDinner: boolean | null;
 }
