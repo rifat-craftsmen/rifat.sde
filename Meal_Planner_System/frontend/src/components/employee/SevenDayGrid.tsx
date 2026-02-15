@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import type { DaySchedule, UpdateMealData } from '../../types';
-import { getNext7Days, formatDisplayDate, isToday, formatDateForAPI } from '../../utils/dateHelpers';
+import { getNext7Days, formatDisplayDate, formatDateForAPI } from '../../utils/dateHelpers';
 
 const SevenDayGrid: React.FC = () => {
     const { user } = useAuth();
@@ -17,44 +17,96 @@ const SevenDayGrid: React.FC = () => {
         },
     });
 
+    // Helper to convert ISO date string to YYYY-MM-DD format for API
+    const extractDateString = (isoDate: string): string => {
+        return isoDate.split('T')[0];
+    };
+
     const updateMealMutation = useMutation({
         mutationFn: async (data: UpdateMealData) => {
             return await api.patch('/meals/my-record', data);
         },
+        onMutate: async (newData) => {
+            // Cancel in-flight queries
+            await queryClient.cancelQueries({ queryKey: ['my-schedule', user?.id] });
+
+            // Get previous data
+            const previousData = queryClient.getQueryData<DaySchedule[]>(['my-schedule', user?.id]);
+
+            // Optimistically update the cache
+            if (previousData) {
+                const updatedSchedule = previousData.map((day) => {
+                    const dayDateString = extractDateString(day.date);
+                    if (dayDateString === newData.date) {
+                        // Create updated record matching MealRecord structure
+                        const updatedRecord = {
+                            id: day.record?.id ?? 0,
+                            userId: user?.id ?? 0,
+                            date: newData.date,
+                            lunch: newData.lunch,
+                            snacks: newData.snacks,
+                            iftar: newData.iftar,
+                            eventDinner: newData.eventDinner,
+                            optionalDinner: newData.optionalDinner,
+                            lastModifiedBy: day.record?.lastModifiedBy,
+                            updatedAt: new Date().toISOString(),
+                        };
+                        return {
+                            ...day,
+                            record: updatedRecord,
+                        };
+                    }
+                    return day;
+                });
+                queryClient.setQueryData(['my-schedule', user?.id], updatedSchedule);
+            }
+
+            return { previousData };
+        },
+        onError: (error, newData, context) => {
+            // Rollback on error
+            if (context?.previousData) {
+                queryClient.setQueryData(['my-schedule', user?.id], context.previousData);
+            }
+        },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['my-schedule'] });
+            // Invalidate to ensure fresh data
+            queryClient.invalidateQueries({ queryKey: ['my-schedule', user?.id] });
             queryClient.invalidateQueries({ queryKey: ['monthly-stats'] });
         },
     });
 
     const handleMealToggle = (date: string, mealType: string, currentValue: boolean | null) => {
         const dayData = schedule?.find((d) => d.date === date);
-        if (!dayData || dayData.isToday || dayData.isPast) return;
+        if (!dayData || dayData.isPast) return;
 
-        const record = dayData.record || {
-            lunch: null,
-            snacks: null,
-            iftar: null,
-            eventDinner: null,
-            optionalDinner: null,
-        };
+        const dateString = extractDateString(date);
+        // Get current values, defaulting to true for lunch/snacks, null for others
+        const currentLunch = dayData.record?.lunch ?? true;
+        const currentSnacks = dayData.record?.snacks ?? true;
+        const currentIftar = dayData.record?.iftar ?? null;
+        const currentEventDinner = dayData.record?.eventDinner ?? null;
+        const currentOptionalDinner = dayData.record?.optionalDinner ?? null;
 
+        // Toggle the specific meal type, keep others unchanged
         updateMealMutation.mutate({
-            date,
-            lunch: mealType === 'lunch' ? !currentValue : (record.lunch ?? false),
-            snacks: mealType === 'snacks' ? !currentValue : (record.snacks ?? false),
-            iftar: mealType === 'iftar' ? !currentValue : (record.iftar ?? false),
-            eventDinner: mealType === 'eventDinner' ? !currentValue : (record.eventDinner ?? false),
-            optionalDinner: mealType === 'optionalDinner' ? !currentValue : (record.optionalDinner ?? false),
+            date: dateString,
+            lunch: mealType === 'lunch' ? !currentLunch : currentLunch,
+            snacks: mealType === 'snacks' ? !currentSnacks : currentSnacks,
+            iftar: mealType === 'iftar' ? !currentIftar : currentIftar,
+            eventDinner: mealType === 'eventDinner' ? !currentEventDinner : currentEventDinner,
+            optionalDinner: mealType === 'optionalDinner' ? !currentOptionalDinner : currentOptionalDinner,
         });
     };
 
     const handleAllOff = (date: string) => {
         const dayData = schedule?.find((d) => d.date === date);
-        if (!dayData || dayData.isToday || dayData.isPast) return;
+        if (!dayData || dayData.isPast) return;
+
+        const dateString = extractDateString(date);
 
         updateMealMutation.mutate({
-            date,
+            date: dateString,
             lunch: false,
             snacks: false,
             iftar: false,
@@ -81,9 +133,15 @@ const SevenDayGrid: React.FC = () => {
 
             <div className="space-y-3">
                 {schedule?.map((day) => {
-                    const record = day.record;
+                    // Default to true for lunch/snacks when no record exists (matching backend defaults)
+                    const lunch = day.record?.lunch ?? true;
+                    const snacks = day.record?.snacks ?? true;
+                    const iftar = day.record?.iftar ?? null;
+                    const eventDinner = day.record?.eventDinner ?? null;
+                    const optionalDinner = day.record?.optionalDinner ?? null;
+
                     const mealSchedule = day.schedule;
-                    const isDisabled = day.isToday || day.isPast;
+                    const isDisabled = day.isPast;
 
                     return (
                         <div
@@ -99,7 +157,10 @@ const SevenDayGrid: React.FC = () => {
                                         {formatDisplayDate(new Date(day.date))}
                                     </h3>
                                     {day.isToday && (
-                                        <span className="text-xs text-primary-600 dark:text-primary-400 font-medium">Today (Cannot Edit)</span>
+                                        <span className="text-xs text-primary-600 dark:text-primary-400 font-medium">Today</span>
+                                    )}
+                                    {day.isPast && !day.isToday && (
+                                        <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Past</span>
                                     )}
                                     {mealSchedule?.occasionName && (
                                         <span className="inline-block mt-1 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full">
@@ -111,7 +172,7 @@ const SevenDayGrid: React.FC = () => {
                                 {!isDisabled && (
                                     <button
                                         onClick={() => handleAllOff(day.date)}
-                                        className="px-3 py-1 text-sm bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                                        className="px-4 py-2 font-medium text-sm bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white rounded-lg transition-colors duration-200 active:scale-95"
                                         disabled={updateMealMutation.isPending}
                                     >
                                         All Off
@@ -124,8 +185,8 @@ const SevenDayGrid: React.FC = () => {
                                     <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={record?.lunch ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'lunch', record?.lunch ?? false)}
+                                            checked={lunch ?? false}
+                                            onChange={() => handleMealToggle(day.date, 'lunch', lunch)}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -137,8 +198,8 @@ const SevenDayGrid: React.FC = () => {
                                     <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={record?.snacks ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'snacks', record?.snacks ?? false)}
+                                            checked={snacks ?? false}
+                                            onChange={() => handleMealToggle(day.date, 'snacks', snacks)}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -150,8 +211,8 @@ const SevenDayGrid: React.FC = () => {
                                     <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={record?.iftar ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'iftar', record?.iftar ?? false)}
+                                            checked={iftar ?? false}
+                                            onChange={() => handleMealToggle(day.date, 'iftar', iftar)}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -163,8 +224,8 @@ const SevenDayGrid: React.FC = () => {
                                     <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={record?.eventDinner ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'eventDinner', record?.eventDinner ?? false)}
+                                            checked={eventDinner ?? false}
+                                            onChange={() => handleMealToggle(day.date, 'eventDinner', eventDinner)}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -176,8 +237,8 @@ const SevenDayGrid: React.FC = () => {
                                     <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={record?.optionalDinner ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'optionalDinner', record?.optionalDinner ?? false)}
+                                            checked={optionalDinner ?? false}
+                                            onChange={() => handleMealToggle(day.date, 'optionalDinner', optionalDinner)}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />

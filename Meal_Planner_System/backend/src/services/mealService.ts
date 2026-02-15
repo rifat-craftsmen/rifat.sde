@@ -1,6 +1,6 @@
 import { startOfDay } from 'date-fns';
 import { prisma } from '../config/prismaClient.js';
-import { formatDateForDB, isDateInValidWindow, getValidDateRange, getCurrentMonthRange } from '../utils/dateHelpers';
+import { formatDateForDB, isDateInValidWindow, getValidDateRange, getCurrentMonthRange, parseDateString } from '../utils/dateHelpers';
 import { MealUpdateData } from '../types';
 
 // Get user's 7-day schedule
@@ -45,13 +45,7 @@ export const getMySchedule = async (userId: number, startDate?: Date) => {
       date: formattedDate.toISOString(),
       isToday: formattedDate.getTime() === today.getTime(),
       isPast: formattedDate.getTime() < today.getTime(),
-      record: {
-        lunch: record?.lunch ?? true,
-        snacks: record?.snacks ?? true,
-        iftar: record?.iftar ?? false,
-        eventDinner: record?.eventDinner ?? false,
-        optionalDinner: record?.optionalDinner ?? false,
-      },
+      record: record || null,
       schedule: {
         lunchEnabled: schedule?.lunchEnabled ?? true,
         snacksEnabled: schedule?.snacksEnabled ?? true,
@@ -72,7 +66,8 @@ export const addOrUpdateMealRecord = async (
   data: MealUpdateData,  // this will be an object with 5 types
   modifiedBy?: number
 ) => {
-  const targetDate = formatDateForDB(new Date(data.date));
+  // Parse date string in YYYY-MM-DD format without timezone shift
+  const targetDate = parseDateString(data.date);
 
   // Validate date is in valid window
   if (!isDateInValidWindow(targetDate)) {

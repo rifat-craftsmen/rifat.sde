@@ -20,9 +20,50 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
         },
     });
 
+    // Helper to convert ISO date string to YYYY-MM-DD format for API
+    const extractDateString = (isoDate: string): string => {
+        return isoDate.split('T')[0];
+    };
+
     const updateMealMutation = useMutation({
         mutationFn: async (data: UpdateMealData) => {
             return await api.patch(`/admin/employee/${userId}/record`, data);
+        },
+        onMutate: async (newData) => {
+            // Cancel in-flight queries
+            await queryClient.cancelQueries({ queryKey: ['employee-schedule', userId] });
+
+            // Get previous data
+            const previousData = queryClient.getQueryData<DaySchedule[]>(['employee-schedule', userId]);
+
+            // Optimistically update the cache
+            if (previousData) {
+                const updatedSchedule = previousData.map((day) => {
+                    const dayDateString = extractDateString(day.date);
+                    if (dayDateString === newData.date) {
+                        return {
+                            ...day,
+                            record: {
+                                lunch: newData.lunch !== undefined ? newData.lunch : (day.record?.lunch ?? false),
+                                snacks: newData.snacks !== undefined ? newData.snacks : (day.record?.snacks ?? false),
+                                iftar: newData.iftar !== undefined ? newData.iftar : (day.record?.iftar ?? false),
+                                eventDinner: newData.eventDinner !== undefined ? newData.eventDinner : (day.record?.eventDinner ?? false),
+                                optionalDinner: newData.optionalDinner !== undefined ? newData.optionalDinner : (day.record?.optionalDinner ?? false),
+                            },
+                        };
+                    }
+                    return day;
+                });
+                queryClient.setQueryData(['employee-schedule', userId], updatedSchedule);
+            }
+
+            return { previousData };
+        },
+        onError: (error, newData, context) => {
+            // Rollback on error
+            if (context?.previousData) {
+                queryClient.setQueryData(['employee-schedule', userId], context.previousData);
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['employee-schedule', userId] });
@@ -33,21 +74,22 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
         const dayData = schedule?.find((d) => d.date === date);
         if (!dayData || dayData.isToday || dayData.isPast) return;
 
+        const dateString = extractDateString(date);
         const record = dayData.record || {
-            lunch: null,
-            snacks: null,
-            iftar: null,
-            eventDinner: null,
-            optionalDinner: null,
+            lunch: false,
+            snacks: false,
+            iftar: false,
+            eventDinner: false,
+            optionalDinner: false,
         };
 
         updateMealMutation.mutate({
-            date,
-            lunch: mealType === 'lunch' ? !currentValue : (record.lunch ?? false),
-            snacks: mealType === 'snacks' ? !currentValue : (record.snacks ?? false),
-            iftar: mealType === 'iftar' ? !currentValue : (record.iftar ?? false),
-            eventDinner: mealType === 'eventDinner' ? !currentValue : (record.eventDinner ?? false),
-            optionalDinner: mealType === 'optionalDinner' ? !currentValue : (record.optionalDinner ?? false),
+            date: dateString,
+            lunch: mealType === 'lunch' ? !currentValue : record.lunch,
+            snacks: mealType === 'snacks' ? !currentValue : record.snacks,
+            iftar: mealType === 'iftar' ? !currentValue : record.iftar,
+            eventDinner: mealType === 'eventDinner' ? !currentValue : record.eventDinner,
+            optionalDinner: mealType === 'optionalDinner' ? !currentValue : record.optionalDinner,
         });
     };
 
@@ -55,8 +97,10 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
         const dayData = schedule?.find((d) => d.date === date);
         if (!dayData || dayData.isToday || dayData.isPast) return;
 
+        const dateString = extractDateString(date);
+
         updateMealMutation.mutate({
-            date,
+            date: dateString,
             lunch: false,
             snacks: false,
             iftar: false,
@@ -85,7 +129,13 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
 
             <div className="space-y-3">
                 {schedule?.map((day) => {
-                    const record = day.record;
+                    const record = day.record || {
+                        lunch: false,
+                        snacks: false,
+                        iftar: false,
+                        eventDinner: false,
+                        optionalDinner: false,
+                    };
                     const mealSchedule = day.schedule;
                     const isDisabled = day.isToday || day.isPast;
 
@@ -115,7 +165,7 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
                                 {!isDisabled && (
                                     <button
                                         onClick={() => handleAllOff(day.date)}
-                                        className="px-3 py-1 text-sm bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                                        className="px-4 py-2 font-medium text-sm bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white rounded-lg transition-colors duration-200 active:scale-95"
                                         disabled={updateMealMutation.isPending}
                                     >
                                         All Off
