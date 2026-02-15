@@ -41,15 +41,21 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
                 const updatedSchedule = previousData.map((day) => {
                     const dayDateString = extractDateString(day.date);
                     if (dayDateString === newData.date) {
+                        const updatedRecord = {
+                            id: day.record?.id ?? 0,
+                            userId,
+                            date: day.date,
+                            lunch: newData.lunch,
+                            snacks: newData.snacks,
+                            iftar: newData.iftar,
+                            eventDinner: newData.eventDinner,
+                            optionalDinner: newData.optionalDinner,
+                            lastModifiedBy: day.record?.lastModifiedBy,
+                            updatedAt: new Date().toISOString(),
+                        };
                         return {
                             ...day,
-                            record: {
-                                lunch: newData.lunch !== undefined ? newData.lunch : (day.record?.lunch ?? false),
-                                snacks: newData.snacks !== undefined ? newData.snacks : (day.record?.snacks ?? false),
-                                iftar: newData.iftar !== undefined ? newData.iftar : (day.record?.iftar ?? false),
-                                eventDinner: newData.eventDinner !== undefined ? newData.eventDinner : (day.record?.eventDinner ?? false),
-                                optionalDinner: newData.optionalDinner !== undefined ? newData.optionalDinner : (day.record?.optionalDinner ?? false),
-                            },
+                            record: updatedRecord,
                         };
                     }
                     return day;
@@ -70,26 +76,33 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
         },
     });
 
-    const handleMealToggle = (date: string, mealType: string, currentValue: boolean | null) => {
+    const handleMealToggle = (date: string, mealType: string) => {
         const dayData = schedule?.find((d) => d.date === date);
         if (!dayData || dayData.isToday || dayData.isPast) return;
 
         const dateString = extractDateString(date);
-        const record = dayData.record || {
-            lunch: false,
-            snacks: false,
-            iftar: false,
-            eventDinner: false,
-            optionalDinner: false,
+        const mealSchedule = dayData.schedule;
+
+        // Get current values: default to true for enabled options, null for disabled ones
+        const currentLunch = mealSchedule?.lunchEnabled !== false ? (dayData.record?.lunch ?? true) : null;
+        const currentSnacks = mealSchedule?.snacksEnabled !== false ? (dayData.record?.snacks ?? true) : null;
+        const currentIftar = mealSchedule?.iftarEnabled ? (dayData.record?.iftar ?? true) : null;
+        const currentEventDinner = mealSchedule?.eventDinnerEnabled ? (dayData.record?.eventDinner ?? true) : null;
+        const currentOptionalDinner = mealSchedule?.optionalDinnerEnabled ? (dayData.record?.optionalDinner ?? true) : null;
+
+        // Toggle only the specific meal type, keep others unchanged
+        const toggleValue = (current: boolean | null): boolean | null => {
+            if (current === null) return null;
+            return !current;
         };
 
         updateMealMutation.mutate({
             date: dateString,
-            lunch: mealType === 'lunch' ? !currentValue : record.lunch,
-            snacks: mealType === 'snacks' ? !currentValue : record.snacks,
-            iftar: mealType === 'iftar' ? !currentValue : record.iftar,
-            eventDinner: mealType === 'eventDinner' ? !currentValue : record.eventDinner,
-            optionalDinner: mealType === 'optionalDinner' ? !currentValue : record.optionalDinner,
+            lunch: mealType === 'lunch' ? toggleValue(currentLunch) : currentLunch,
+            snacks: mealType === 'snacks' ? toggleValue(currentSnacks) : currentSnacks,
+            iftar: mealType === 'iftar' ? toggleValue(currentIftar) : currentIftar,
+            eventDinner: mealType === 'eventDinner' ? toggleValue(currentEventDinner) : currentEventDinner,
+            optionalDinner: mealType === 'optionalDinner' ? toggleValue(currentOptionalDinner) : currentOptionalDinner,
         });
     };
 
@@ -129,13 +142,13 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
 
             <div className="space-y-3">
                 {schedule?.map((day) => {
-                    const record = day.record || {
-                        lunch: false,
-                        snacks: false,
-                        iftar: false,
-                        eventDinner: false,
-                        optionalDinner: false,
-                    };
+                    // Default to true for lunch/snacks when no record exists (matching backend defaults)
+                    const lunch = day.record?.lunch ?? true;
+                    const snacks = day.record?.snacks ?? true;
+                    const iftar = day.record?.iftar ?? null;
+                    const eventDinner = day.record?.eventDinner ?? null;
+                    const optionalDinner = day.record?.optionalDinner ?? null;
+
                     const mealSchedule = day.schedule;
                     const isDisabled = day.isToday || day.isPast;
 
@@ -178,8 +191,8 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
                                     <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={record?.lunch ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'lunch', record?.lunch ?? false)}
+                                            checked={lunch ?? false}
+                                            onChange={() => handleMealToggle(day.date, 'lunch')}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -191,8 +204,8 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
                                     <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={record?.snacks ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'snacks', record?.snacks ?? false)}
+                                            checked={snacks ?? false}
+                                            onChange={() => handleMealToggle(day.date, 'snacks')}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -204,8 +217,8 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
                                     <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={record?.iftar ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'iftar', record?.iftar ?? false)}
+                                            checked={iftar ?? false}
+                                            onChange={() => handleMealToggle(day.date, 'iftar')}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -217,8 +230,8 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
                                     <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={record?.eventDinner ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'eventDinner', record?.eventDinner ?? false)}
+                                            checked={eventDinner ?? false}
+                                            onChange={() => handleMealToggle(day.date, 'eventDinner')}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -230,8 +243,8 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
                                     <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <input
                                             type="checkbox"
-                                            checked={record?.optionalDinner ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'optionalDinner', record?.optionalDinner ?? false)}
+                                            checked={optionalDinner ?? false}
+                                            onChange={() => handleMealToggle(day.date, 'optionalDinner')}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />

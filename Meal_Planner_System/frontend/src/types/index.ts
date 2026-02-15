@@ -70,6 +70,16 @@ export interface LoginCredentials {
     password: string;
 }
 
+export interface Team {
+    id: number;
+    name: string;
+    leadId: number;
+    lead: {
+        id: number;
+        name: string;
+    };
+}
+
 export interface CreateUserData {
     name: string;
     email: string;

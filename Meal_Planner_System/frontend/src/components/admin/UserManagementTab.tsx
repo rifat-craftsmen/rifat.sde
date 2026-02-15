@@ -1,14 +1,30 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
-import type { User, CreateUserData, UpdateUserData } from '../../types';
+import type { User, Team, CreateUserData, UpdateUserData, Role, UserStatus } from '../../types';
 
+// ─── Role badge colors ───
+const roleBadge = (role: string) => {
+    switch (role) {
+        case 'ADMIN':
+            return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300';
+        case 'LEAD':
+            return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300';
+        case 'LOGISTICS':
+            return 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300';
+        default:
+            return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300';
+    }
+};
+
+// ─── Create User Modal ───
 interface CreateUserModalProps {
     isOpen: boolean;
     onClose: () => void;
+    teams: Team[];
 }
 
-const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose }) => {
+const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, teams }) => {
     const queryClient = useQueryClient();
     const [formData, setFormData] = useState<CreateUserData>({
         name: '',
@@ -100,13 +116,27 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose }) =>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Role</label>
                             <select
                                 value={formData.role}
-                                onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+                                onChange={(e) => setFormData({ ...formData, role: e.target.value as Role })}
                                 className="input-field"
                             >
                                 <option value="EMPLOYEE">Employee</option>
                                 <option value="LEAD">Team Lead</option>
                                 <option value="ADMIN">Admin</option>
                                 <option value="LOGISTICS">Logistics</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Team</label>
+                            <select
+                                value={formData.teamId ?? ''}
+                                onChange={(e) => setFormData({ ...formData, teamId: e.target.value ? parseInt(e.target.value) : undefined })}
+                                className="input-field"
+                            >
+                                <option value="">No Team</option>
+                                {teams.map((team) => (
+                                    <option key={team.id} value={team.id}>{team.name}</option>
+                                ))}
                             </select>
                         </div>
 
@@ -131,15 +161,158 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose }) =>
     );
 };
 
+// ─── Edit User Modal ───
+interface EditUserModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    user: User;
+    teams: Team[];
+}
+
+const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, user, teams }) => {
+    const queryClient = useQueryClient();
+    const [formData, setFormData] = useState<UpdateUserData>({
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        teamId: user.teamId,
+        status: user.status,
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: async (data: UpdateUserData) => {
+            const response = await api.patch(`/admin/users/${user.id}`, data);
+            return response.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['all-users'] });
+            onClose();
+        },
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        updateMutation.mutate(formData);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="card max-w-md w-full animate-slide-up">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Edit User</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Name</label>
+                        <input
+                            type="text"
+                            value={formData.name ?? ''}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            required
+                            className="input-field"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email</label>
+                        <input
+                            type="email"
+                            value={formData.email ?? ''}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            required
+                            className="input-field"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Role</label>
+                        <select
+                            value={formData.role ?? user.role}
+                            onChange={(e) => setFormData({ ...formData, role: e.target.value as Role })}
+                            className="input-field"
+                        >
+                            <option value="EMPLOYEE">Employee</option>
+                            <option value="LEAD">Team Lead</option>
+                            <option value="ADMIN">Admin</option>
+                            <option value="LOGISTICS">Logistics</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Team</label>
+                        <select
+                            value={formData.teamId ?? ''}
+                            onChange={(e) => setFormData({ ...formData, teamId: e.target.value ? parseInt(e.target.value) : undefined })}
+                            className="input-field"
+                        >
+                            <option value="">No Team</option>
+                            {teams.map((team) => (
+                                <option key={team.id} value={team.id}>{team.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Status</label>
+                        <select
+                            value={formData.status ?? user.status}
+                            onChange={(e) => setFormData({ ...formData, status: e.target.value as UserStatus })}
+                            className="input-field"
+                        >
+                            <option value="ACTIVE">Active</option>
+                            <option value="INACTIVE">Inactive</option>
+                        </select>
+                    </div>
+
+                    {updateMutation.isError && (
+                        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-800 dark:text-red-200">
+                            {(updateMutation.error as any)?.response?.data?.error || 'Failed to update user'}
+                        </div>
+                    )}
+
+                    <div className="flex space-x-3">
+                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={updateMutation.isPending} className="flex-1 btn-primary disabled:opacity-50">
+                            {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// ─── Main Tab ───
 const UserManagementTab: React.FC = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const queryClient = useQueryClient();
 
     const { data: users, isLoading } = useQuery<User[]>({
-        queryKey: ['all-users'],
+        queryKey: ['all-users', searchQuery],
         queryFn: async () => {
-            const response = await api.get('/admin/employees');
+            const params = searchQuery ? `?search=${encodeURIComponent(searchQuery)}` : '';
+            const response = await api.get(`/admin/employees${params}`);
             return response.data.employees;
+        },
+    });
+
+    const { data: teams = [] } = useQuery<Team[]>({
+        queryKey: ['all-teams'],
+        queryFn: async () => {
+            const response = await api.get('/admin/teams');
+            return response.data.teams;
         },
     });
 
@@ -160,7 +333,7 @@ const UserManagementTab: React.FC = () => {
 
     return (
         <div>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <h2 className="text-2xl font-bold text-slate-800 dark:text-white">User Management</h2>
                 <button onClick={() => setIsCreateModalOpen(true)} className="btn-primary">
                     <span className="flex items-center">
@@ -172,6 +345,18 @@ const UserManagementTab: React.FC = () => {
                 </button>
             </div>
 
+            {/* Search */}
+            <div className="mb-6">
+                <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by name or email..."
+                    className="input-field max-w-md"
+                />
+            </div>
+
+            {/* Users table */}
             {isLoading ? (
                 <div className="space-y-3">
                     {[...Array(6)].map((_, i) => (
@@ -197,7 +382,7 @@ const UserManagementTab: React.FC = () => {
                                     <td className="p-3 text-sm text-slate-900 dark:text-white font-medium">{user.name}</td>
                                     <td className="p-3 text-sm text-slate-600 dark:text-slate-400">{user.email}</td>
                                     <td className="p-3">
-                                        <span className="px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs rounded-full">
+                                        <span className={`px-2 py-1 text-xs rounded-full ${roleBadge(user.role)}`}>
                                             {user.role}
                                         </span>
                                     </td>
@@ -213,12 +398,21 @@ const UserManagementTab: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="p-3 text-right">
-                                        <button
-                                            onClick={() => handleDelete(user.id, user.name)}
-                                            className="px-3 py-1 text-sm bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                                        >
-                                            Delete
-                                        </button>
+                                        <div className="flex items-center justify-end space-x-2">
+                                            <button
+                                                onClick={() => setEditingUser(user)}
+                                                className="px-3 py-1 text-sm bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(user.id, user.name)}
+                                                disabled={deleteMutation.isPending}
+                                                className="px-3 py-1 text-sm bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -227,11 +421,26 @@ const UserManagementTab: React.FC = () => {
                 </div>
             ) : (
                 <div className="text-center py-12 text-slate-600 dark:text-slate-400">
-                    <p>No users found</p>
+                    <p>{searchQuery ? 'No users match your search' : 'No users found'}</p>
                 </div>
             )}
 
-            <CreateUserModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+            {deleteMutation.isError && (
+                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-800 dark:text-red-200">
+                    {(deleteMutation.error as any)?.response?.data?.error || 'Failed to delete user'}
+                </div>
+            )}
+
+            <CreateUserModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} teams={teams} />
+
+            {editingUser && (
+                <EditUserModal
+                    isOpen={true}
+                    onClose={() => setEditingUser(null)}
+                    user={editingUser}
+                    teams={teams}
+                />
+            )}
         </div>
     );
 };

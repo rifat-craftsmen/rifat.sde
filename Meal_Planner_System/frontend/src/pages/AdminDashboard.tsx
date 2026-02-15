@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import UserManagementTab from '../components/admin/UserManagementTab';
+import ScheduleManagementTab from '../components/admin/ScheduleManagementTab';
+import EmployeeProxyTab from '../components/admin/EmployeeProxyTab';
+import HeadcountReportsTab from '../components/admin/HeadcountReportsTab';
 
 type TabType = 'users' | 'schedules' | 'proxy' | 'headcount';
 
@@ -64,45 +68,10 @@ const AdminDashboard: React.FC = () => {
 
                 {/* Tab Content */}
                 <div className="card animate-fade-in">
-                    {activeTab === 'users' && (
-                        <div>
-                            <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white">User Management</h2>
-                            <div className="text-center py-12 text-slate-600 dark:text-slate-400">
-                                <p className="text-lg">User management features coming soon</p>
-                                <p className="text-sm mt-2">Create, edit, and manage user accounts</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'schedules' && (
-                        <div>
-                            <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white">Schedule Management</h2>
-                            <div className="text-center py-12 text-slate-600 dark:text-slate-400">
-                                <p className="text-lg">Schedule management features coming soon</p>
-                                <p className="text-sm mt-2">Create special occasions and meal schedules</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'proxy' && (
-                        <div>
-                            <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white">Employee Proxy Editing</h2>
-                            <div className="text-center py-12 text-slate-600 dark:text-slate-400">
-                                <p className="text-lg">Proxy editing features coming soon</p>
-                                <p className="text-sm mt-2">Edit any employee's meal preferences</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'headcount' && (
-                        <div>
-                            <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-white">Headcount Reports</h2>
-                            <div className="text-center py-12 text-slate-600 dark:text-slate-400">
-                                <p className="text-lg">Headcount reporting features coming soon</p>
-                                <p className="text-sm mt-2">View daily meal headcounts</p>
-                            </div>
-                        </div>
-                    )}
+                    {activeTab === 'users' && <UserManagementTab />}
+                    {activeTab === 'schedules' && <ScheduleManagementTab />}
+                    {activeTab === 'proxy' && <EmployeeProxyTab />}
+                    {activeTab === 'headcount' && <HeadcountReportsTab />}
                 </div>
             </div>
         </div>

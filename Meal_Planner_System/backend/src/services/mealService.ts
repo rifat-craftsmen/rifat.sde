@@ -1,4 +1,3 @@
-import { startOfDay } from 'date-fns';
 import { prisma } from '../config/prismaClient.js';
 import { formatDateForDB, isDateInValidWindow, getValidDateRange, getCurrentMonthRange, parseDateString } from '../utils/dateHelpers';
 import { MealUpdateData } from '../types';
@@ -31,7 +30,7 @@ export const getMySchedule = async (userId: number, startDate?: Date) => {
 
   // Build 7-day grid
   const scheduleArray = [];
-  const today = startOfDay(new Date());
+  const today = formatDateForDB(new Date());
 
   for (let i = 0; i < 7; i++) {
     const currentDate = new Date(start);

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getEmployees,
+  getTeams,
   getMyTeamMembers,
   getEmployeeSchedule,
   updateEmployeeMeals,
@@ -30,6 +31,7 @@ router.delete('/users/:userId', authenticate, requireRole('ADMIN'), deleteUserCo
 
 // Employee management
 router.get('/employees', authenticate, requireRole('ADMIN'), getEmployees);
+router.get('/teams', authenticate, requireRole('ADMIN'), getTeams);
 router.get('/team/members', authenticate, requireRole('LEAD', 'ADMIN'), getMyTeamMembers);
 
 // Proxy meal editing
