@@ -3,8 +3,9 @@ import { AuthRequest } from '../types';
 import {
     searchEmployees,
     getTeamMembers,
+    getAllTeams,
     createMealSchedule,
-    getMealSchedule,
+    getAllMealSchedules,
     deleteMealSchedule,
     getDailyHeadcount,
 } from '../services/adminService';
@@ -15,6 +16,15 @@ export const getEmployees = async (req: AuthRequest, res: Response) => {
         const searchQuery = req.query.search as string | undefined;
         const employees = await searchEmployees(searchQuery);
         return res.json({ employees });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const getTeams = async (req: AuthRequest, res: Response) => {
+    try {
+        const teams = await getAllTeams();
+        return res.json({ teams });
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
     }
@@ -78,9 +88,8 @@ export const createSchedule = async (req: AuthRequest, res: Response) => {
 
 export const getSchedule = async (req: AuthRequest, res: Response) => {
     try {
-        const date = new Date(req.query.date as string);
-        const schedule = await getMealSchedule(date);
-        return res.json({ schedule });
+        const schedules = await getAllMealSchedules();
+        return res.json({ schedules });
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
     }

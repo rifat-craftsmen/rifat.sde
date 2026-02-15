@@ -23,7 +23,7 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({ isOpen, onClo
 
     const createMutation = useMutation({
         mutationFn: async (data: CreateScheduleData) => {
-            await api.post('/admin/schedule', data);
+            await api.post('/admin/meal-schedule', data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['meal-schedules'] });
@@ -168,14 +168,14 @@ const ScheduleManagementTab: React.FC = () => {
     const { data: schedules, isLoading } = useQuery<MealSchedule[]>({
         queryKey: ['meal-schedules'],
         queryFn: async () => {
-            const response = await api.get('/admin/schedules');
+            const response = await api.get('/admin/meal-schedule');
             return response.data.schedules;
         },
     });
 
     const deleteMutation = useMutation({
         mutationFn: async (scheduleId: number) => {
-            await api.delete(`/admin/schedule/${scheduleId}`);
+            await api.delete(`/admin/meal-schedule/${scheduleId}`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['meal-schedules'] });
@@ -215,7 +215,7 @@ const ScheduleManagementTab: React.FC = () => {
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                     <div className="flex items-center space-x-3 mb-2">
-                                        <h3 className="font-semibold text-slate-900 dark:text-white">{schedule.date}</h3>
+                                        <h3 className="font-semibold text-slate-900 dark:text-white">{schedule.date.split('T')[0]}</h3>
                                         {schedule.occasionName && (
                                             <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-sm rounded-full">
                                                 {schedule.occasionName}

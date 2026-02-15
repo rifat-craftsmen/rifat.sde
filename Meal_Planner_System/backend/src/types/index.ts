@@ -12,11 +12,11 @@ export interface AuthRequest extends Request {
 
 export interface MealUpdateData {
   date: string;
-  lunch: boolean;
-  snacks: boolean;
-  iftar: boolean;
-  eventDinner: boolean;
-  optionalDinner: boolean;
+  lunch: boolean | null;
+  snacks: boolean | null;
+  iftar: boolean | null;
+  eventDinner: boolean | null;
+  optionalDinner: boolean | null;
 }
 
 export interface CreateScheduleData {
@@ -27,6 +27,4 @@ export interface CreateScheduleData {
   eventDinnerEnabled: boolean;
   optionalDinnerEnabled: boolean;
   occasionName?: string;
-  isHoliday: boolean;
-  isOfficeClosed: boolean;
 }

@@ -42,7 +42,7 @@ const SevenDayGrid: React.FC = () => {
                         const updatedRecord = {
                             id: day.record?.id ?? 0,
                             userId: user?.id ?? 0,
-                            date: newData.date,
+                            date: day.date,
                             lunch: newData.lunch,
                             snacks: newData.snacks,
                             iftar: newData.iftar,
@@ -76,26 +76,33 @@ const SevenDayGrid: React.FC = () => {
         },
     });
 
-    const handleMealToggle = (date: string, mealType: string, currentValue: boolean | null) => {
+    const handleMealToggle = (date: string, mealType: string) => {
         const dayData = schedule?.find((d) => d.date === date);
         if (!dayData || dayData.isPast) return;
 
         const dateString = extractDateString(date);
-        // Get current values, defaulting to true for lunch/snacks, null for others
-        const currentLunch = dayData.record?.lunch ?? true;
-        const currentSnacks = dayData.record?.snacks ?? true;
-        const currentIftar = dayData.record?.iftar ?? null;
-        const currentEventDinner = dayData.record?.eventDinner ?? null;
-        const currentOptionalDinner = dayData.record?.optionalDinner ?? null;
+        const mealSchedule = dayData.schedule;
 
-        // Toggle the specific meal type, keep others unchanged
+        // Get current values: default to true for enabled options, null for disabled ones
+        const currentLunch = mealSchedule?.lunchEnabled !== false ? (dayData.record?.lunch ?? true) : null;
+        const currentSnacks = mealSchedule?.snacksEnabled !== false ? (dayData.record?.snacks ?? true) : null;
+        const currentIftar = mealSchedule?.iftarEnabled ? (dayData.record?.iftar ?? true) : null;
+        const currentEventDinner = mealSchedule?.eventDinnerEnabled ? (dayData.record?.eventDinner ?? true) : null;
+        const currentOptionalDinner = mealSchedule?.optionalDinnerEnabled ? (dayData.record?.optionalDinner ?? true) : null;
+
+        // Toggle only the specific meal type, keep others unchanged
+        const toggleValue = (current: boolean | null): boolean | null => {
+            if (current === null) return null;
+            return !current;
+        };
+
         updateMealMutation.mutate({
             date: dateString,
-            lunch: mealType === 'lunch' ? !currentLunch : currentLunch,
-            snacks: mealType === 'snacks' ? !currentSnacks : currentSnacks,
-            iftar: mealType === 'iftar' ? !currentIftar : currentIftar,
-            eventDinner: mealType === 'eventDinner' ? !currentEventDinner : currentEventDinner,
-            optionalDinner: mealType === 'optionalDinner' ? !currentOptionalDinner : currentOptionalDinner,
+            lunch: mealType === 'lunch' ? toggleValue(currentLunch) : currentLunch,
+            snacks: mealType === 'snacks' ? toggleValue(currentSnacks) : currentSnacks,
+            iftar: mealType === 'iftar' ? toggleValue(currentIftar) : currentIftar,
+            eventDinner: mealType === 'eventDinner' ? toggleValue(currentEventDinner) : currentEventDinner,
+            optionalDinner: mealType === 'optionalDinner' ? toggleValue(currentOptionalDinner) : currentOptionalDinner,
         });
     };
 
@@ -186,7 +193,7 @@ const SevenDayGrid: React.FC = () => {
                                         <input
                                             type="checkbox"
                                             checked={lunch ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'lunch', lunch)}
+                                            onChange={() => handleMealToggle(day.date, 'lunch')}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -199,7 +206,7 @@ const SevenDayGrid: React.FC = () => {
                                         <input
                                             type="checkbox"
                                             checked={snacks ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'snacks', snacks)}
+                                            onChange={() => handleMealToggle(day.date, 'snacks')}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -212,7 +219,7 @@ const SevenDayGrid: React.FC = () => {
                                         <input
                                             type="checkbox"
                                             checked={iftar ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'iftar', iftar)}
+                                            onChange={() => handleMealToggle(day.date, 'iftar')}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -225,7 +232,7 @@ const SevenDayGrid: React.FC = () => {
                                         <input
                                             type="checkbox"
                                             checked={eventDinner ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'eventDinner', eventDinner)}
+                                            onChange={() => handleMealToggle(day.date, 'eventDinner')}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
@@ -238,7 +245,7 @@ const SevenDayGrid: React.FC = () => {
                                         <input
                                             type="checkbox"
                                             checked={optionalDinner ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'optionalDinner', optionalDinner)}
+                                            onChange={() => handleMealToggle(day.date, 'optionalDinner')}
                                             disabled={isDisabled || updateMealMutation.isPending}
                                             className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
                                         />
