@@ -16,7 +16,7 @@ export const loginValidation = [
 ];
 
 export const mealUpdateValidation = [
-  body('date').isISO8601().toDate().withMessage('Valid date required'),
+  body('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('Valid date in YYYY-MM-DD format required'),
   body('lunch').isBoolean(),
   body('snacks').isBoolean(),
   body('iftar').isBoolean(),

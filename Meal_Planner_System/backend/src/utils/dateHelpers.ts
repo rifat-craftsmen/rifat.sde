@@ -29,3 +29,10 @@ export const getCurrentMonthRange = (): { start: Date; end: Date } => {
 export const formatDateForDB = (date: Date): Date => {
   return startOfDay(date);
 };
+
+// Parse date string in YYYY-MM-DD format without timezone shift
+export const parseDateString = (dateString: string): Date => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return startOfDay(date);
+};
