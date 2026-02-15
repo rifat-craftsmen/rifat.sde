@@ -1,6 +1,24 @@
 import { prisma } from '../config/prismaClient.js';
-import { formatDateForDB } from '../utils/dateHelpers';
+import { formatDateForDB, parseDateString } from '../utils/dateHelpers';
 import { CreateScheduleData } from '../types';
+
+// Get all teams
+export const getAllTeams = async () => {
+  return await prisma.team.findMany({
+    select: {
+      id: true,
+      name: true,
+      leadId: true,
+      lead: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: { name: 'asc' },
+  });
+};
 
 // Get all employees or search
 export const searchEmployees = async (searchQuery?: string) => {
@@ -47,7 +65,7 @@ export const getTeamMembers = async (teamId: number) => {
 
 // Create or update meal schedule
 export const createMealSchedule = async (data: CreateScheduleData, createdBy: number) => {
-  const targetDate = formatDateForDB(new Date(data.date));
+  const targetDate = parseDateString(data.date);
 
   return await prisma.mealSchedule.upsert({
     where: { date: targetDate },
@@ -57,19 +75,26 @@ export const createMealSchedule = async (data: CreateScheduleData, createdBy: nu
       iftarEnabled: data.iftarEnabled,
       eventDinnerEnabled: data.eventDinnerEnabled,
       optionalDinnerEnabled: data.optionalDinnerEnabled,
-      occasionName: data.occasionName,
+      occasionName: data.occasionName || null,
       createdBy,
     },
     create: {
-      date: targetDate, 
+      date: targetDate,
       lunchEnabled: data.lunchEnabled,
       snacksEnabled: data.snacksEnabled,
       iftarEnabled: data.iftarEnabled,
       eventDinnerEnabled: data.eventDinnerEnabled,
       optionalDinnerEnabled: data.optionalDinnerEnabled,
-      occasionName: data.occasionName,
+      occasionName: data.occasionName || null,
       createdBy,
     },
+  });
+};
+
+// Get all meal schedules
+export const getAllMealSchedules = async () => {
+  return await prisma.mealSchedule.findMany({
+    orderBy: { date: 'desc' },
   });
 };
 
