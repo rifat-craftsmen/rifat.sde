@@ -1,10 +1,19 @@
-import { searchEmployees, getTeamMembers, createMealSchedule, getMealSchedule, deleteMealSchedule, getDailyHeadcount, } from '../services/adminService';
+import { searchEmployees, getTeamMembers, getAllTeams, createMealSchedule, getAllMealSchedules, deleteMealSchedule, getDailyHeadcount, } from '../services/adminService';
 import { getMySchedule, addOrUpdateMealRecord } from '../services/mealService';
 export const getEmployees = async (req, res) => {
     try {
         const searchQuery = req.query.search;
         const employees = await searchEmployees(searchQuery);
         return res.json({ employees });
+    }
+    catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+export const getTeams = async (req, res) => {
+    try {
+        const teams = await getAllTeams();
+        return res.json({ teams });
     }
     catch (error) {
         return res.status(500).json({ error: error.message });
@@ -62,9 +71,8 @@ export const createSchedule = async (req, res) => {
 };
 export const getSchedule = async (req, res) => {
     try {
-        const date = new Date(req.query.date);
-        const schedule = await getMealSchedule(date);
-        return res.json({ schedule });
+        const schedules = await getAllMealSchedules();
+        return res.json({ schedules });
     }
     catch (error) {
         return res.status(500).json({ error: error.message });

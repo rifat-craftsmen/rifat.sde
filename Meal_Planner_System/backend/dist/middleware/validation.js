@@ -12,24 +12,22 @@ export const loginValidation = [
     validateRequest,
 ];
 export const mealUpdateValidation = [
-    body('date').isISO8601().toDate().withMessage('Valid date required'),
-    body('lunch').isBoolean(),
-    body('snacks').isBoolean(),
-    body('iftar').isBoolean(),
-    body('eventDinner').isBoolean(),
-    body('optionalDinner').isBoolean(),
+    body('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('Valid date in YYYY-MM-DD format required'),
+    body('lunch').optional({ nullable: true }).isBoolean(),
+    body('snacks').optional({ nullable: true }).isBoolean(),
+    body('iftar').optional({ nullable: true }).isBoolean(),
+    body('eventDinner').optional({ nullable: true }).isBoolean(),
+    body('optionalDinner').optional({ nullable: true }).isBoolean(),
     validateRequest,
 ];
 export const scheduleValidation = [
-    body('date').isISO8601().toDate().withMessage('Valid date required'),
+    body('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('Valid date in YYYY-MM-DD format required'),
     body('lunchEnabled').isBoolean(),
     body('snacksEnabled').isBoolean(),
     body('iftarEnabled').isBoolean(),
     body('eventDinnerEnabled').isBoolean(),
     body('optionalDinnerEnabled').isBoolean(),
     body('occasionName').optional().isString(),
-    body('isHoliday').isBoolean(),
-    body('isOfficeClosed').isBoolean(),
     validateRequest,
 ];
 export const userCreationValidation = [

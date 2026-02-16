@@ -1,5 +1,22 @@
 import { prisma } from '../config/prismaClient.js';
-import { formatDateForDB } from '../utils/dateHelpers';
+import { formatDateForDB, parseDateString } from '../utils/dateHelpers';
+// Get all teams
+export const getAllTeams = async () => {
+    return await prisma.team.findMany({
+        select: {
+            id: true,
+            name: true,
+            leadId: true,
+            lead: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+        },
+        orderBy: { name: 'asc' },
+    });
+};
 // Get all employees or search
 export const searchEmployees = async (searchQuery) => {
     return await prisma.user.findMany({
@@ -43,7 +60,7 @@ export const getTeamMembers = async (teamId) => {
 };
 // Create or update meal schedule
 export const createMealSchedule = async (data, createdBy) => {
-    const targetDate = formatDateForDB(new Date(data.date));
+    const targetDate = parseDateString(data.date);
     return await prisma.mealSchedule.upsert({
         where: { date: targetDate },
         update: {
@@ -52,7 +69,7 @@ export const createMealSchedule = async (data, createdBy) => {
             iftarEnabled: data.iftarEnabled,
             eventDinnerEnabled: data.eventDinnerEnabled,
             optionalDinnerEnabled: data.optionalDinnerEnabled,
-            occasionName: data.occasionName,
+            occasionName: data.occasionName || null,
             createdBy,
         },
         create: {
@@ -62,9 +79,15 @@ export const createMealSchedule = async (data, createdBy) => {
             iftarEnabled: data.iftarEnabled,
             eventDinnerEnabled: data.eventDinnerEnabled,
             optionalDinnerEnabled: data.optionalDinnerEnabled,
-            occasionName: data.occasionName,
+            occasionName: data.occasionName || null,
             createdBy,
         },
+    });
+};
+// Get all meal schedules
+export const getAllMealSchedules = async () => {
+    return await prisma.mealSchedule.findMany({
+        orderBy: { date: 'desc' },
     });
 };
 // Get meal schedule for a date
