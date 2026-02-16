@@ -1,6 +1,5 @@
-import { startOfDay } from 'date-fns';
 import { prisma } from '../config/prismaClient.js';
-import { formatDateForDB, isDateInValidWindow, getValidDateRange, getCurrentMonthRange } from '../utils/dateHelpers';
+import { formatDateForDB, isDateInValidWindow, getValidDateRange, getCurrentMonthRange, parseDateString } from '../utils/dateHelpers';
 // Get user's 7-day schedule
 export const getMySchedule = async (userId, startDate) => {
     const { start, end } = getValidDateRange();
@@ -26,7 +25,7 @@ export const getMySchedule = async (userId, startDate) => {
     });
     // Build 7-day grid
     const scheduleArray = [];
-    const today = startOfDay(new Date());
+    const today = formatDateForDB(new Date());
     for (let i = 0; i < 7; i++) {
         const currentDate = new Date(start);
         currentDate.setDate(currentDate.getDate() + i);
@@ -37,13 +36,7 @@ export const getMySchedule = async (userId, startDate) => {
             date: formattedDate.toISOString(),
             isToday: formattedDate.getTime() === today.getTime(),
             isPast: formattedDate.getTime() < today.getTime(),
-            record: {
-                lunch: record?.lunch ?? true,
-                snacks: record?.snacks ?? true,
-                iftar: record?.iftar ?? false,
-                eventDinner: record?.eventDinner ?? false,
-                optionalDinner: record?.optionalDinner ?? false,
-            },
+            record: record || null,
             schedule: {
                 lunchEnabled: schedule?.lunchEnabled ?? true,
                 snacksEnabled: schedule?.snacksEnabled ?? true,
@@ -59,7 +52,8 @@ export const getMySchedule = async (userId, startDate) => {
 // Add or update meal record
 export const addOrUpdateMealRecord = async (userId, data, // this will be an object with 5 types
 modifiedBy) => {
-    const targetDate = formatDateForDB(new Date(data.date));
+    // Parse date string in YYYY-MM-DD format without timezone shift
+    const targetDate = parseDateString(data.date);
     // Validate date is in valid window
     if (!isDateInValidWindow(targetDate)) {
         throw new Error('Can only add/edit meals for next 7 days');
