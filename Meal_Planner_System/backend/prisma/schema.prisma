@@ -1,0 +1,96 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  EMPLOYEE
+  LEAD
+  ADMIN
+  LOGISTICS
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id        Int          @id @default(autoincrement())
+  name      String
+  email     String       @unique
+  password  String
+  role      Role         @default(EMPLOYEE)
+  status    UserStatus   @default(ACTIVE)
+  teamId    Int?
+  
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  
+  team      Team?        @relation("TeamMembers", fields: [teamId], references: [id])
+  ledTeam   Team?        @relation("TeamLead")
+  records   MealRecord[]
+  
+  @@index([email])
+  @@index([teamId])
+  @@index([status])
+}
+
+model Team {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  leadId    Int      @unique
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  members   User[]   @relation("TeamMembers")
+  lead      User     @relation("TeamLead", fields: [leadId], references: [id])
+  
+  @@index([leadId])
+}
+
+model MealSchedule {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @unique @db.Date
+  
+  lunchEnabled          Boolean @default(true)
+  snacksEnabled         Boolean @default(true)
+  iftarEnabled          Boolean @default(false)
+  eventDinnerEnabled    Boolean @default(false)
+  optionalDinnerEnabled Boolean @default(false)
+  occasionName   String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy Int
+  
+  @@index([date])
+}
+
+model MealRecord {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  date      DateTime @db.Date
+  
+  lunch          Boolean?
+  snacks         Boolean?
+  iftar          Boolean?
+  eventDinner    Boolean?
+  optionalDinner Boolean?
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  lastModifiedBy Int?
+  notificationSent Boolean @default(false)
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, date])
+  @@index([date])
+  @@index([userId])
+}
