@@ -1,7 +1,7 @@
 ## Meal Headcount Planner Technical Design Document
 - Author: Rifat Ahmed
-- Iteration: 1
-- Version: v3
+- Iteration: 2
+- Version: v1
 - Status: In Review
 
 ---
@@ -18,12 +18,24 @@ The **Meal Headcount Planner (MHP)** is an internal web application designed to 
 - Special occasion scheduling for events and holidays
 - Proxy meal management by Team Leads and Admins
 
+
 **Expected Outcomes:**
 - Reduce logistics team workload through automation
 - Provide accurate daily headcount within seconds
 - Enable employees to plan meals up to 7 days in advance
 - Maintain complete audit trail of meal participation changes
 - Eliminate manual Excel file sharing and consolidation
+
+
+**Key New Features added at Iteration 2:**
+1. Team-based visibility and participation tracking
+2. Bulk meal update operations for Team Leads and Admins
+3. Work location (Office/WFH) tracking per employee per date
+4. Company-wide WFH period management
+5. Enhanced headcount reporting with team breakdown and office/WFH split
+6. Daily announcement message generation
+7. Special day type presets (Office Closed, Government Holiday, etc.)
+8. Live HeadCount dashboard updates
 
 ---
 
@@ -59,7 +71,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 **Primary Goals:**
 1. **Automation**: Eliminate 80% of manual data entry through automated record creation
-2. **Accuracy**: Reduce headcount variance  
+2. **Accuracy**: Reduce headcount variance
 3. **Speed**: Provide real-time headcount instead of hours manual consolidation
 4. **User Experience**: Enable employees to manage meals in <30 seconds per day
 5. **Flexibility**: Allow advance planning up to 7 days ahead
@@ -147,9 +159,54 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 - FR8.3: System must hash passwords before storing in database
 - FR8.4: System must display generated password and admin will share it with new user
-- FR8.5: [Future Enhancement] System should send welcome email with password reset link to new users mail where he can set new - password 
-- FR8.6: Admins must be able to deactivate and delete users 
+- FR8.5: [Future Enhancement] System should send welcome email with password reset link to new users mail where he can set new - password
+- FR8.6: Admins must be able to deactivate and delete users
 - FR8.7: Inactive users must not appear in meal planning.
+
+
+
+**FR9: Team-Based Visibility**
+- FR9.1: Employees must see their team name displayed on dashboard
+- FR9.2: Team Leads must view daily participation of their team members with date selection
+- FR9.3: Admin must view daily participation across all teams
+- FR9.4: Daily participation view must show employee names, teams, work location, and meal selections
+
+**FR10: Bulk Operations**
+- FR10.1: Team Leads must apply bulk actions to their team members within valid date window
+- FR10.2: Admins must apply bulk actions to any employees within valid date window
+- FR10.3: Bulk actions supported: WFH for All, All Off, Set All Meals, Unset All Meals
+- FR10.4: Bulk operations should use database transactions for atomicity
+- FR10.5: Bulk operations must record admin/lead user ID in `lastModifiedBy` field
+
+**FR11: Work Location Tracking**
+- FR11.1: Employees must chose `WFH` if want to work from home for any date in valid window (office is default)
+- FR11.2: WFH selection must automatically set all meals to false and WFH=true
+- FR11.3: Work location is default to Office (WFH=false)
+- FR11.4: Team Leads/Admins must correct work location via daily participation tab or bulk actions
+
+**FR12: Company-wide WFH Periods**
+- FR12.1: Admins must declare date ranges as company-wide WFH periods
+- FR12.2: Global WFH periods can include optional notes (e.g., "Remote work week")
+- FR12.3: Headcount reporting must check global WFH periods and flag active periods
+- FR12.4: Individual employee WFH settings must be overridden by globalWFH periods
+- FR12.5: Admins can edit and delete global WFH periods 
+
+**FR13: Enhanced Headcount Reporting**
+- FR13.1: Headcount reports must display totals by meal type (existing functionality)
+- FR13.2: Headcount reports must display team-wise breakdown (total meals per team)
+- FR13.3: Headcount reports must display overall total (sum of all meal types)
+- FR13.4: Headcount reports must display office vs WFH split
+- FR13.5: Reports must account for global WFH periods in office/WFH calculations
+
+**FR14: Daily Announcement Generation**
+- FR14.1: Admin/Logistics must generate copy-paste friendly announcement for selected date
+- FR14.2: Announcement must include: date, meal totals, office/WFH split, special occasion notes
+- FR14.3: Announcement must include team breakdown 
+- FR14.4: Announcement must display in textarea with copy button
+
+**FR15: Live Dashboard Updates**
+- FR15.1: Headcount reports must auto-refresh without relaoding when any meal status changes by any user
+
 
 ### 4.2 Non-Functional Requirements
 
@@ -192,8 +249,8 @@ The organization currently uses an Excel-based system to track daily meal headco
 | **Styling** | Tailwind CSS | 3.x | - Rapid UI development<br>- Utility-first approach reduces CSS complexity<br>- Built-in responsive design<br>- Small production bundle |
 | **State Management** | TanStack Query (React Query) | 5.x | - Automatic caching and refetching<br>- Optimistic updates out-of-box<br>- Server state synchronization<br>- Reduces boilerplate vs Redux |
 | **Backend** | Node.js + Express | 20.x / 4.x | - JavaScript/TypeScript full-stack consistency<br>- Fast API development<br>- Mature ecosystem<br>- Team expertise |
-| **Database** | PostgreSQL (Neon) | 15.x | - **Cloud-hosted**: No local infrastructure needed<br>- **Free tier**: 0.5 GB storage (sufficient for 500+ users)<br>- **Reliable**: ACID compliance for data integrity<br>- **Prisma support**: Official adapter available<br>- **Scalable**: Easy upgrade path to paid tier |
-| **ORM** | Prisma | 5.x | - Type-safe database queries<br>- Automatic TypeScript types generation<br>- Migration-free with `db push` for rapid iteration<br>- Excellent developer experience<br>- Built-in connection pooling |
+| **Database** | PostgreSQL | 15.x | - **Local**: Runs locally using Docker<br> - **Reliable**: ACID compliance for data integrity |
+| **ORM** | Prisma | 5.x | - Type-safe database queries<br>- Automatic TypeScript types generation<br>- Migration-free with `db push` for rapid iteration<br>- Built-in connection pooling |
 | **Authentication** | JWT + HTTP-only Cookies | - | - Stateless authentication<br>- XSS protection via HTTP-only flag<br>- CSRF protection via SameSite attribute<br>- No session storage needed |
 | **Password Hashing** | bcrypt | 5.x | - Industry standard for password security<br>- Adjustable cost factor (future-proof)<br>- Salt generation built-in |
 | **Automation** | node-cron | 3.x | - Simple cron syntax<br>- Runs in-process (no external scheduler)<br>- Timezone support |
@@ -201,19 +258,21 @@ The organization currently uses an Excel-based system to track daily meal headco
 | **Rate Limiting** | express-rate-limit | 7.x | -  Prevents DoS/Brute-force attacks<br>- Simple middleware integration<br>- Supports custom stores (Redis, Memcached)|
 | **Date Handling** | date-fns | 3.x | - Lightweight (vs Moment.js)<br>- Modular imports<br>- Immutable date operations<br>- TypeScript native |
 
-### 5.2 Why PostgreSQL on Neon (Cloud Database)?
+### 5.2 Why PostgreSQL With Prisma and Docker?
 
 **Decision Rationale:**
-1. **No Infrastructure Overhead**: No need to manage local PostgreSQL or Docker containers
-2. **Team Accessibility**: All developers can access the same database instance for collaboration
-3. **Free Tier Sufficient**: Enough storage to handle 100-500 employees with their historical data
-4. **Production-Ready**: Same database can be used from development to production
-5. **Automatic Backups**: Neon provides automated daily backups
-6. **Connection Pooling**: Built-in pgBouncer reduces connection overhead
-7. **Developer Experience**: Instant setup, no local configuration
+1. **Environment Consistency**: Docker ensures the database version and configuration are identical for all developers, eliminating "it works on my machine" bugs.
+
+2. **Data Sovereignty**: Local hosting keeps sensitive employee data within the controlled environment, satisfying privacy requirements and supervisor constraints.
+
+3. **Type Safety:** Prisma ORM provides auto-generated TypeScript types, reducing runtime errors during development.
+
+4. **Zero Latency:** Local execution removes network delays associated with cloud providers like Neon.
+
+
 
 **Alternative Considered:**
-- **Local PostgreSQL**: Rejected due to setup complexity and team synchronization issues
+- **Cloud PostgreSQL (Neon/RDS)**: Rejected due to external infrastructure dependency and data privacy constraints.
 - **SQLite**: Rejected due to lack of concurrent write support and production limitations
 - **MongoDB**: Rejected due to relational data model (Users → Teams → MealRecords)
 
@@ -233,7 +292,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ### 6.1 Employee Daily Flow
 
-**Actor:** Employee (John)  
+**Actor:** Employee (John)
 **Goal:** Update meal participation for tomorrow
 
 **Steps:**
@@ -259,7 +318,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ### 6.2 Team Lead Proxy Edit Flow
 
-**Actor:** Team Lead (Sarah)  
+**Actor:** Team Lead (Sarah)
 **Goal:** Opt out an employee who forgot to update their meals
 
 **Steps:**
@@ -286,7 +345,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ### 6.3 Admin Special Occasion Flow
 
-**Actor:** Admin (Alice)  
+**Actor:** Admin (Alice)
 **Goal:** Set up Event Dinner for company annual party
 
 **Steps:**
@@ -299,7 +358,7 @@ The organization currently uses an Excel-based system to track daily meal headco
    - **Lunch**: Enabled (checked)
    - **Snacks**: Enabled (checked)
    - **Iftar**: Disabled (unchecked)
-   - **Event Dinner**: Enabled (checked) ← Special meal
+   - **Event Dinner**: Enabled (checked) – Special meal
    - **Optional Dinner**: Disabled (unchecked)
 5. Clicks "Save"
 6. System creates MealSchedule record for March 15
@@ -317,7 +376,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ### 6.4 Logistics Daily Reporting Flow
 
-**Actor:** Logistics Manager (Maria)  
+**Actor:** Logistics Manager (Maria)
 **Goal:** Get headcount for today's meals to send to chef
 
 **Steps:**
@@ -342,12 +401,12 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ### 6.5 Daily Cron Job Flow (System Process)
 
-**Actor:** System (automated)  
+**Actor:** System (automated)
 **Goal:** Create meal records for tomorrow for all active employees
 
 **Steps:**
 
-1. **Trigger**: System clock reaches 09:00 PM server time 
+1. **Trigger**: System clock reaches 09:00 PM server time
 
 2. **Calculate Date**: Determine tomorrow's date (e.g., Feb 7)
 
@@ -360,12 +419,12 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 5. **For Each User**:
    - Check if MealRecord exists for `userId + Feb 7`
-   
+
    **If record does NOT exist:**
-   - Create new MealRecord with meal defaults coming from step 4 
+   - Create new MealRecord with meal defaults coming from step 4
    - Set lastModifiedBy = null (system-generated)
    - Set notificationSent = false
-   
+
    **If record DOES exist:**
    - For each meal column (lunch, snacks, iftar, eventDinner, optionalDinner):
      - **If column is `null`**: Apply values from meal defaults coming from step 4
@@ -376,7 +435,7 @@ The organization currently uses an Excel-based system to track daily meal headco
    - Updated 15 records with new special events (only `null` columns)
    - Skipped 23 users (all meals already decided, no `null` values)
 
-7. **Special Case**: 
+7. **Special Case**:
     - When a user dont want to participate in any meals including special ones, he can click **All meals off** button, it will create a row where for all mealtypes value will be false.
     - Any special occasion (even those occassions added after his selection) will be ignored during cron jobs.
 
@@ -387,8 +446,136 @@ The organization currently uses an Excel-based system to track daily meal headco
   - Transaction rollback if bulk insert fails
   - Special events added after user's meal selection are handled gracefully via three-state nullable boolean pattern.
 
+### 6.6 Employee WFH Selection Flow
+
+**Actor:** Employee (John)
+**Goal:** Mark himself as WFH for tomorrow
+
+**Steps:**
+1. John opens his 7-day meal grid
+2. For tomorrow's row, he sees two buttons: "All Off" and "WFH"
+3. John clicks "WFH" button
+4. System creates/updates MealRecord:
+   - Sets workFromHome = true
+   - Sets all meals (lunch, snacks, iftar, eventDinner, optionalDinner) = false
+5. All meal checkboxes are unchecked
+6. Change saves immediately with optimistic update
+
+**Alternative: Employee Already Set Meals, Then Changes to WFH**
+1. John already selected lunch=true, snacks=false for tomorrow
+2. John clicks "WFH" button
+3. System overwrites all meal selections to false (regardless of previous state)
+4. workFromHome flag set to true
+
+---
+
+### 6.7 Team Lead Bulk Update Flow
+
+**Actor:** Team Lead (Sarah)
+**Goal:** Mark entire team as WFH for a specific date due to team offsite
+
+**Steps:**
+1. Sarah logs into Team Lead dashboard
+2. Clicks "Today's Team Participation" tab
+3. Selects date: Feb 10 (within valid window)
+4. System displays all team members in table with:
+   - Checkboxes for selection
+   - Name, Team, Location columns
+   - Meal columns (Lunch, Snacks, Iftar, Event Dinner, Optional Dinner)
+5. Sarah sees bulk action buttons at top (hidden if date is past/today)
+6. Sarah checks "Select All" checkbox (selects all 8 team members)
+7. Sarah clicks "WFH for All" bulk action button
+8. System sends bulk update request to backend
+9. Backend validates:
+   - Sarah's role (LEAD)
+   - All selected users belong to Sarah's team
+   - Date is within valid window
+10. Backend uses transaction to update all 8 MealRecords:
+    - Sets workFromHome = true
+    - Sets all meals = false
+    - Sets lastModifiedBy = Sarah's user ID
+11. Success message: "8 employees updated to WFH"
+12. Table refreshes showing blue WFH badges and all meals unchecked
+
+**Access Control:**
+- If Sarah tries to bulk edit another team's members, backend returns 403
+- Middleware checks teamId match before allowing operation
+
+---
+
+### 6.8 Admin Global WFH Period Flow
+
+**Actor:** Admin (Alice)
+**Goal:** Declare company-wide WFH period for a week
+
+**Steps:**
+1. Alice logs into Admin dashboard
+2. Clicks "Global WFH" tab
+3. Sees form: "Declare Company-wide WFH Period"
+4. Fills form:
+   - **Date From**: March 1, 2025
+   - **Date To**: March 7, 2025
+   - **Note**: "Remote work week - Office renovation"
+5. Clicks "Apply WFH Period" button
+6. System creates GlobalWFHPeriod record
+7. Success message: "Global WFH period created for Mar 1 - Mar 7"
+8. Period appears in "Active & Upcoming WFH Periods" table below
+9. **Impact on Headcount Reporting**:
+   - Any date from March 1-7: Headcount report shows "Global WFH Period Active"
+   - Office/WFH split calculation accounts for global period
+   - Daily announcement includes note: "Remote work week - Office renovation"
+
+**Deletion:**
+1. Alice finds period in table
+2. Clicks "Delete" button
+3. Confirmation modal shows and Confirms deletion
+4. GlobalWFHPeriod record deleted
+5. Future headcount reports no longer show global WFH flag
+
+---
 
 
+### 6.9 Logistics Daily Announcement Flow
+
+**Actor:** Logistics Manager (Maria)
+**Goal:** Generate announcement for today's meal headcount
+
+**Steps:**
+1. Maria logs into Logistics dashboard
+2. Clicks "Headcount Reports" tab
+3. Selects today's date
+4. Reviews headcount cards showing:
+   - Meal totals: Lunch (85), Snacks (78), etc.
+   - Team breakdown: Engineering [total (120 meals), Lunch (85), Snacks (78), etc], Marketing[total (20 meals), Lunch (12), Snacks (4), etc], etc.
+   - Office/WFH split: Office (92), WFH (13)
+   - Overall total: 195 meals
+5. Clicks "Generate Announcement" button
+6. Modal appears with pre-formatted message:
+
+```
+📅 Daily Meal Headcount - Monday, February 17, 2026
+
+🎉 Special Occasion: Company Annual Celebration [if exist]
+
+🍽️ Meal Headcount:
+   🍱 Lunch: 85 people
+   🍪 Snacks: 78 people
+   🍽️ Optional Dinner: 12 people
+
+📊 Total Meals: 175
+
+📍 Work Location:
+   🏢 Office: 92 people
+   🏠 WFH: 13 people
+
+👥 Team Breakdown:
+   Engineering: 120 meals
+   Marketing: 45 meals
+   Operations: 30 meals
+```
+
+7. Maria clicks "Copy" button
+8. System copies message to clipboard
 
 
 ---
@@ -398,63 +585,63 @@ The organization currently uses an Excel-based system to track daily meal headco
 ### 7.1 System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────┐
 │                         CLIENT LAYER                             │
 │                   (React + TypeScript + Tailwind)                │
-├─────────────────────────────────────────────────────────────────┤
+├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐   │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
 │  │    Employee    │  │   Team Lead    │  │     Admin      │   │
 │  │   Dashboard    │  │   Dashboard    │  │   Dashboard    │   │
-│  └────────────────┘  └────────────────┘  └────────────────┘   │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘   │
 │                                                                  │
-│  ┌────────────────────────────────────────────────────────┐    │
+│  ┌──────────────────────────────────────────────────────────────┐    │
 │  │              Logistics Dashboard                       │    │
-│  └────────────────────────────────────────────────────────┘    │
+│  └──────────────────────────────────────────────────────────────┘    │
 │                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-                              ↕ HTTPS / REST API
-┌─────────────────────────────────────────────────────────────────┐
+└──────────────────────────────────────────────────────────────────┘
+                              ↓ HTTPS / REST API
+┌──────────────────────────────────────────────────────────────────┐
 │                         API LAYER                                │
 │                   (Node.js + Express + TypeScript)               │
-├─────────────────────────────────────────────────────────────────┤
+├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
 │  │     Auth     │  │     Meal     │  │    Admin     │         │
 │  │     API      │  │     API      │  │     API      │         │
-│  └──────────────┘  └──────────────┘  └──────────────┘         │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘         │
 │                                                                  │
-│  ┌────────────────────────────────────────────────────────┐    │
+│  ┌──────────────────────────────────────────────────────────────┐    │
 │  │              Middleware Layer                          │    │
 │  │  • Authentication (JWT)                                │    │
 │  │  • Authorization (Role-based)                          │    │
 │  │  • Validation (express-validator)                      │    │
 │  │  • Error Handling                                      │    │
-│  └────────────────────────────────────────────────────────┘    │
+│  └──────────────────────────────────────────────────────────────┘    │
 │                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-                              ↕ Prisma ORM
-┌─────────────────────────────────────────────────────────────────┐
+└──────────────────────────────────────────────────────────────────┘
+                              ↓ Prisma ORM
+┌──────────────────────────────────────────────────────────────────┐
 │                      DATABASE LAYER                              │
-│                   (PostgreSQL on Neon Cloud)                     │
-├─────────────────────────────────────────────────────────────────┤
+│                   (PostgreSQL on Docker)                     │
+├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ┌──────┐  ┌──────┐  ┌──────────────┐  ┌─────────────┐        │
+│  ┌────────┐  ┌────────┐  ┌──────────────────┐  ┌─────────────────┐        │
 │  │ User │  │ Team │  │ MealSchedule │  │ MealRecord  │        │
-│  └──────┘  └──────┘  └──────────────┘  └─────────────┘        │
+│  └────────┘  └────────┘  └──────────────────┘  └─────────────────┘        │
 │                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-                              ↕
-┌─────────────────────────────────────────────────────────────────┐
+└──────────────────────────────────────────────────────────────────┘
+                              ↓
+┌──────────────────────────────────────────────────────────────────┐
 │                    AUTOMATION LAYER                              │
 │                        (node-cron)                               │
-├─────────────────────────────────────────────────────────────────┤
+├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  Daily Job (9 PM): Create tomorrow's meal records           │
 │  • Respect existing user-created records                        │
 │  • Apply meal schedule rules                                    │
 │                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### 7.2 Database Schema Design
@@ -465,26 +652,26 @@ The organization currently uses an Excel-based system to track daily meal headco
 ┌─────────────┐
 │    User     │
 ├─────────────┤
-│ id (PK)     │───┐
+│ id (PK)     ├───┐
 │ email       │   │
 │ password    │   │
 │ role        │   │
 │ status      │   │
-│ teamId (FK) │───┼───────┐
+│ teamId (FK) ├───┼────────┐
 └─────────────┘   │       │
                   │       │
-                  │   ┌───▼──────┐
+                  │   ┌───┴─────────┐
                   │   │   Team   │
-                  │   ├──────────┤
+                  │   ├────────────┤
                   │   │ id (PK)  │
                   │   │ name     │
-                  │   │ leadId   │◄─── (FK to User)
-                  │   └──────────┘
+                  │   │ leadId   ├───┐ (FK to User)
+                  │   └────────────┘
                   │
                   │
-                  │   ┌────────────────┐
+                  │   ┌────────────────────┐
                   └───►  MealRecord    │
-                      ├────────────────┤
+                      ├────────────────────┤
                       │ id (PK)        │
                       │ userId (FK)    │
                       │ date           │
@@ -493,12 +680,13 @@ The organization currently uses an Excel-based system to track daily meal headco
                       │ iftar          │
                       │ eventDinner    │
                       │ optionalDinner │
+                      │ workFromHome   │
                       │ lastModifiedBy │
-                      └────────────────┘
-                      
-                      ┌────────────────────┐
+                      └────────────────────┘
+
+                      ┌──────────────────────┐
                       │   MealSchedule     │
-                      ├────────────────────┤
+                      ├──────────────────────┤
                       │ id (PK)            │
                       │ date (UNIQUE)      │
                       │ lunchEnabled       │
@@ -507,7 +695,20 @@ The organization currently uses an Excel-based system to track daily meal headco
                       │ eventDinnerEnabled │
                       │ occasionName       │
                       │ createdBy          │
-                      └────────────────────┘
+                      └──────────────────────┘
+
+
+                      ┌──────────────────────┐
+                      │   GlobalWFHPeriod    │
+                      ├──────────────────────┤
+                      │ id (PK)              │
+                      │ dateFrom             │
+                      │ dateTo               │
+                      │ note                 │
+                      │ createdAt            │
+                      │ updatedAt            │
+                      │ createdBy            │
+                      └──────────────────────┘
 ```
 
 **Table Descriptions:**
@@ -515,7 +716,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 **User Table:**
 - Stores employee information and credentials
 - Fields: id, name, email, password (hashed), role (EMPLOYEE/LEAD/ADMIN/LOGISTICS), status (ACTIVE/INACTIVE), teamId
-- Password Management: Passwords hashed with bcrypt before storage  
+- Password Management: Passwords hashed with bcrypt before storage
 - Account Creation: New users created by Admin with auto-generated or custom password
 - Future Enhancement: Password reset via email link (requires notification system)
 - Single role per user (no combined roles)
@@ -575,6 +776,13 @@ The organization currently uses an Excel-based system to track daily meal headco
 | PATCH  | `/api/admin/users/:userId`    | Admin | Update user details (name, role, team, status) |
 | GET    | `/api/admin/users/:userId`    | Admin | Get user details |
 | DELETE | `/api/admin/users/:userId`    | Admin | Delete a user account |
+| GET | `/api/admin/daily-participation?date=YYYY-MM-DD` | LEAD, ADMIN | Get daily participation (team-filtered for LEAD) |
+| POST | `/api/admin/meals/bulk-update` | LEAD, ADMIN | Bulk update meals for selected employees |
+| POST | `/api/admin/global-wfh` | ADMIN | Create company-wide WFH period |
+| GET | `/api/admin/global-wfh` | ADMIN | Get all global WFH periods |
+| DELETE | `/api/admin/global-wfh/:id` | ADMIN | Delete global WFH period |
+| POST | `/api/admin/generate-announcement` | ADMIN, LOGISTICS | Generate daily announcement message |
+
 
 **Sample Request/Response:**
 
@@ -615,56 +823,147 @@ App
 ├── AuthProvider
 │   └── ProtectedRoute
 │       ├── EmployeeDashboard
+│       │   ├── TeamBadge  
 │       │   ├── MonthlyStatsCard
-│       │   ├── SevenDayGrid
+│       │   └── SevenDayGrid
 │       │       └── DayRow
 │       │           ├── MealCheckbox
-│       │           └── AllOffButton
+│       │           ├── AllOffButton
+│       │           ├── WFHButton  
+│       │           └── WFHBadge 
 │       │
-│       ├── TeamLeadDashboard
-│       │   ├── TeamMemberSearch
-│       │   ├── TeamMemberList
-│       │   │   └── MemberCard
-│       │   └── EmployeeEditModal
-│       │       └── SevenDayGrid 
-│       │           └── DayRow 
-│       │           └── AllOffButton
+│       ├── TeamLeadDashboard  
+│       │   └── Tabs  
+│       │       ├── My Meals Tab
+│       │       │   └── SevenDayGrid
+│       │       │       └── DayRow
+│       │       │           ├── MealCheckbox
+│       │       │           ├── AllOffButton
+│       │       │           ├── WFHButton  
+│       │       │           └── WFHBadge  
+│       │       │
+│       │       ├── Team Participation Tab  
+│       │       │   └── DailyParticipationTab (teamScope=true)
+│       │       │       ├── DatePicker
+│       │       │       ├── StatusMessage (read-only/editable)
+│       │       │       ├── BulkActionsToolbar (if editable)
+│       │       │       │   ├── WFH for All Button
+│       │       │       │   ├── All Off Button
+│       │       │       │   ├── Set All Meals Button
+│       │       │       │   └── Unset All Meals Button
+│       │       │       └── EmployeeTable
+│       │       │           └── EmployeeRow
+│       │       │               ├── SelectCheckbox
+│       │       │               ├── Name
+│       │       │               ├── Team
+│       │       │               ├── LocationBadge (Office/WFH)
+│       │       │               └── MealColumns (5 meal types)
+│       │       │
+│       │       └── Search & Edit Tab
+│       │           └── EmployeeProxyTab
+│       │               ├── TeamMemberSearch
+│       │               ├── TeamMemberList
+│       │               │   └── MemberCard
+│       │               └── EmployeeEditModal
+│       │                   └── SevenDayGrid
 │       │
-│       ├── AdminDashboard
-│       │   ├── Tabs
-│       │   │   ├── UserManagementTab
-│       │   │   │   ├── CreateUserButton → CreateUserModal
-│       │   │   │   │   └── UserForm
-│       │   │   │   ├── UserListTable
-│       │   │   │   │   └── UserRow
-│       │   │   │   │       ├── EditButton → EditUserModal
-│       │   │   │   │       ├── DeactivateButton
-│       │   │   │   │       └── DeleteButton (soft delete)
-│       │   │   │   └── BulkActionsToolbar
-│       │   │   │
-│       │   │   ├── ScheduleManagementTab
-│       │   │   │   ├── CreateScheduleButton → CreateScheduleModal
-│       │   │   │   │   └── ScheduleForm
-│       │   │   │   ├── ScheduleListTable
-│       │   │   │   │   └── ScheduleRow
-│       │   │   │   │       ├── EditButton → EditScheduleModal
-│       │   │   │   │       └── DeleteButton
-│       │   │   │   └── UpcomingEventList
-│       │   │   │
-│       │   │   ├── EmployeeProxyTab
-│       │   │   │   ├── EmployeeSearchBar
-│       │   │   │   ├── EmployeeListTable
-│       │   │   │   └── EmployeeEditModal 
-│       │   │   │
-│       │   │   └── HeadcountReportsTab
-│       │   │       ├── DatePicker
-│       │   │       ├── HeadcountCards
-│       │   │
-│       │   └── SystemStats (Dashboard overview)
+│       ├── AdminDashboard  
+│       │   └── Tabs
+│       │       ├── UserManagementTab
+│       │       │   ├── CreateUserButton → CreateUserModal
+│       │       │   │   └── UserForm
+│       │       │   ├── UserListTable
+│       │       │   │   └── UserRow
+│       │       │   │       ├── EditButton → EditUserModal
+│       │       │   │       ├── DeactivateButton
+│       │       │   │       └── DeleteButton (soft delete)
+│       │       │   └── BulkActionsToolbar
+│       │       │
+│       │       ├── ScheduleManagementTab  
+│       │       │   ├── CreateScheduleButton → CreateScheduleModal
+│       │       │   │   └── ScheduleForm
+│       │       │   │       ├── DatePicker
+│       │       │   │       ├── SpecialDayTypeDropdown (NEW)
+│       │       │   │       │   ├── Office Closed
+│       │       │   │       │   ├── Government Holiday
+│       │       │   │       │   ├── Special Celebration
+│       │       │   │       │   └── Custom (shows text input)
+│       │       │   │       └── MealToggles
+│       │       │   ├── ScheduleListTable
+│       │       │   │   └── ScheduleRow
+│       │       │   │       ├── EditButton → EditScheduleModal
+│       │       │   │       └── DeleteButton
+│       │       │   └── UpcomingEventList
+│       │       │
+│       │       ├── EmployeeProxyTab
+│       │       │   ├── EmployeeSearchBar
+│       │       │   ├── EmployeeListTable
+│       │       │   └── EmployeeEditModal
+│       │       │       └── SevenDayGrid
+│       │       │
+│       │       ├── Daily Participation Tab  
+│       │       │   └── DailyParticipationTab (teamScope=false)
+│       │       │       ├── DatePicker
+│       │       │       ├── StatusMessage (read-only/editable)
+│       │       │       ├── BulkActionsToolbar (if editable)
+│       │       │       │   ├── WFH for All Button
+│       │       │       │   ├── All Off Button
+│       │       │       │   ├── Set All Meals Button
+│       │       │       │   └── Unset All Meals Button
+│       │       │       └── EmployeeTable (all employees)
+│       │       │           └── EmployeeRow
+│       │       │               ├── SelectCheckbox
+│       │       │               ├── Name
+│       │       │               ├── Team
+│       │       │               ├── LocationBadge (Office/WFH)
+│       │       │               └── MealColumns (5 meal types)
+│       │       │
+│       │       ├── HeadcountReportsTab 
+│       │       │   ├── DatePicker
+│       │       │   ├── GlobalWFHBanner (if active)
+│       │       │   ├── TotalEmployeesCard
+│       │       │   ├── MealHeadcountCards (5 meal types)
+│       │       │   ├── TeamBreakdownCards  
+│       │       │   │   └── TeamCard
+│       │       │   │       ├── TeamName
+│       │       │   │       ├── TotalMeals
+│       │       │   │       └── MealTypeBreakdown (NEW)
+│       │       │   │           ├── Lunch count
+│       │       │   │           ├── Snacks count
+│       │       │   │           ├── Iftar count
+│       │       │   │           ├── Event Dinner count
+│       │       │   │           └── Optional Dinner count
+│       │       │   ├── OfficeWFHSplitCards 
+│       │       │   │   ├── OfficeCard
+│       │       │   │   └── WFHCard
+│       │       │   ├── OverallTotalCard 
+│       │       │   └── GenerateAnnouncementButton 
+│       │       │       └── AnnouncementModal
+│       │       │           ├── MessageTextArea
+│       │       │           └── CopyButton
+│       │       │
+│       │       └── Global WFH Tab 
+│       │           └── GlobalWFHTab
+│       │               ├── CreateWFHPeriodForm
+│       │               │   ├── DateFromPicker
+│       │               │   ├── DateToPicker
+│       │               │   ├── NoteInput
+│       │               │   └── ApplyButton
+│       │               └── WFHPeriodsTable
+│       │                   └── WFHPeriodRow
+│       │                       ├── DateFrom
+│       │                       ├── DateTo
+│       │                       ├── Note
+│       │                       └── DeleteButton
 │       │
-│       └── LogisticsDashboard
+│       └── LogisticsDashboard  
 │           ├── DatePicker
-│           ├── HeadcountCards
+│           ├── GlobalWFHBanner (if active)
+│           ├── MealHeadcountCards
+│           ├── TeamBreakdownCards 
+│           ├── OfficeWFHSplitCards 
+│           ├── OverallTotalCard 
+│           └── GenerateAnnouncementButton 
 │
 └── LoginPage
     └── LoginForm
@@ -702,7 +1001,7 @@ App
 - **Better UX**: Employees see their default state immediately (all meals checked)
 
 **Trade-off:**
-- **Database size**: Creates ~100 records/day 
+- **Database size**: Creates ~100 records/day
 - **Cron dependency**: System relies on scheduled job (but manual override always possible)
 
 **Alternative Considered:**
@@ -762,27 +1061,8 @@ App
 
 ---
 
-### 8.5 PostgreSQL (Cloud) vs SQLite (Local File)
 
-**Decision:** Use PostgreSQL on Neon cloud instead of SQLite
-
-**Rationale:**
-- **Concurrent writes**: PostgreSQL handles multiple users editing simultaneously; SQLite locks entire database
-- **Team collaboration**: Cloud database accessible to all developers
-- **Production-ready**: Same database from development to production
-- **Scalability**: Can handle 500+ users without performance degradation
-
-**Trade-off:**
-- **Internet dependency**: Requires network connection (but Neon has 99.9% uptime)
-- **Cost**: Free tier has storage limit, but sufficient for this use case
-
-**Alternative Considered:**
-- SQLite: Rejected due to lack of concurrent write support (critical for 100 users)
-- Local PostgreSQL: Rejected due to setup complexity and synchronization issues
-
----
-
-### 8.6 Notification Architecture (Future-Ready)
+### 8.5 Notification Architecture (Future-Ready)
 
 **Decision:** Add notification metadata fields now (`lastModifiedBy`, `notificationSent`) but implement notification logic in Iteration 2
 
@@ -993,7 +1273,7 @@ describe('isDateInValidWindow', () => {
 
 **Tools:**
 - **Framework**: Supertest (HTTP assertions) + Jest
-- **Database**: Separate test database on Neon (or in-memory SQLite)
+- **Database**: Separate test database on postgres
 
 **Test Areas:**
 
@@ -1082,107 +1362,107 @@ describe('POST /api/meals/my-record', () => {
 #### A. Employee Checklist
 
 **Authentication & Access**
--  Employee can log in with valid credentials.
--  Invalid login returns proper error message.
--  Employee cannot access Admin/Lead/Logistics endpoints (403).
--  Session persists correctly for configured duration.
--  Logout clears authentication cookie.
+- ☐ Employee can log in with valid credentials.
+- ☐ Invalid login returns proper error message.
+- ☐ Employee cannot access Admin/Lead/Logistics endpoints (403).
+- ☐ Session persists correctly for configured duration.
+- ☐ Logout clears authentication cookie.
 
 **Meal Viewing & Selection**
--  Employee can view 7-day meal grid.
--  Today's meals cannot be edited.
--  Only valid planning window (tomorrow → next 6 days) is editable.
--  Only meal types defined in `meal_schedule` appear for selected date.
--  Default meals (Lunch, Snacks) appear when no special schedule exists.
--  Special events appear when scheduled.
--  Employee can toggle individual meal types.
--  Selection creates or updates a MealRecord correctly.
--  “All Off” sets all meal columns to `false`.
--  UI reflects saved state immediately.
--  Invalid payload (wrong date/format) shows proper error.
+- ☐ Employee can view 7-day meal grid.
+- ☐ Today's meals cannot be edited.
+- ☐ Only valid planning window (tomorrow → next 6 days) is editable.
+- ☐ Only meal types defined in `meal_schedule` appear for selected date.
+- ☐ Default meals (Lunch, Snacks) appear when no special schedule exists.
+- ☐ Special events appear when scheduled.
+- ☐ Employee can toggle individual meal types.
+- ☐ Selection creates or updates a MealRecord correctly.
+- ☐ "All Off" sets all meal columns to `false`.
+- ☐ UI reflects saved state immediately.
+- ☐ Invalid payload (wrong date/format) shows proper error.
 
 
 
 #### B. Team Lead Checklist
 
 **Access Scope**
--  Lead can log in and access Lead dashboard.
--  Lead can view only their assigned team members.
--  Lead cannot access members from other teams.
--  Direct API access to another team’s member returns 403.
+- ☐ Lead can log in and access Lead dashboard.
+- ☐ Lead can view only their assigned team members.
+- ☐ Lead cannot access members from other teams.
+- ☐ Direct API access to another team's member returns 403.
 
 **Proxy Meal Management**
--  Lead can open a team member’s meal schedule.
--  Lead can update team member meal selections.
--  Proxy update respects date window rules.
--  Proxy edit correctly sets `lastModifiedBy` to Lead ID.
--  “All Off” works correctly in proxy mode.
--  Special events appear correctly in member view.
--  Changes are reflected in headcount reporting.
+- ☐ Lead can open a team member's meal schedule.
+- ☐ Lead can update team member meal selections.
+- ☐ Proxy update respects date window rules.
+- ☐ Proxy edit correctly sets `lastModifiedBy` to Lead ID.
+- ☐ "All Off" works correctly in proxy mode.
+- ☐ Special events appear correctly in member view.
+- ☐ Changes are reflected in headcount reporting.
 
 
 
 #### C. Admin Checklist
 
 **User Management**
--  Admin can create new user with valid data.
--  Required fields validation works.
--  Duplicate email creation is prevented.
--  Admin can update user details (name, role, team, status).
--  Admin can deactivate user (status = INACTIVE).
--  Inactive users do not appear in meal planning.
--  Admin can delete user.
--  Deleted user cannot log in.
+- ☐ Admin can create new user with valid data.
+- ☐ Required fields validation works.
+- ☐ Duplicate email creation is prevented.
+- ☐ Admin can update user details (name, role, team, status).
+- ☐ Admin can deactivate user (status = INACTIVE).
+- ☐ Inactive users do not appear in meal planning.
+- ☐ Admin can delete user.
+- ☐ Deleted user cannot log in.
 
 **Schedule Management**
--  Admin can create MealSchedule for a date.
--  Admin can enable/disable specific meal types.
--  Admin can set occasion name.
--  Schedule changes reflect in UI immediately.
--  Admin can delete schedule exception.
--  System falls back to default meals when schedule is removed.
+- ☐ Admin can create MealSchedule for a date.
+- ☐ Admin can enable/disable specific meal types.
+- ☐ Admin can set occasion name.
+- ☐ Schedule changes reflect in UI immediately.
+- ☐ Admin can delete schedule exception.
+- ☐ System falls back to default meals when schedule is removed.
 
 **Global Permissions**
--  Admin can access all employees across teams.
--  Admin can proxy edit any employee.
--  Admin-only endpoints are blocked for non-admin roles.
+- ☐ Admin can access all employees across teams.
+- ☐ Admin can proxy edit any employee.
+- ☐ Admin-only endpoints are blocked for non-admin roles.
 
 
 
 #### D. Logistics Checklist
 
 **Reporting Access**
--  Logistics can log in and access reporting dashboard.
--  Logistics can view daily headcount.
--  Logistics can select historical dates.
--  Headcount values are accurate per meal type.
--  Logistics cannot edit meals.
--  Logistics cannot access user management endpoints.
+- ☐ Logistics can log in and access reporting dashboard.
+- ☐ Logistics can view daily headcount.
+- ☐ Logistics can select historical dates.
+- ☐ Headcount values are accurate per meal type.
+- ☐ Logistics cannot edit meals.
+- ☐ Logistics cannot access user management endpoints.
 
 
 #### E. System & Automation Checklist
 
 **Cron Job Behavior**
--  Cron creates MealRecord if none exists.
--  Cron does not overwrite `true` or `false` values.
--  Cron updates only `null` columns.
--  Cron applies MealSchedule rules when present.
--  Cron uses default rules when no schedule exists.
--  No duplicate records are created.
--  Cron handles special event added after user selection correctly.
--  “All Off” records remain unchanged after cron.
--  Cron execution is logged.
+- ☐ Cron creates MealRecord if none exists.
+- ☐ Cron does not overwrite `true` or `false` values.
+- ☐ Cron updates only `null` columns.
+- ☐ Cron applies MealSchedule rules when present.
+- ☐ Cron uses default rules when no schedule exists.
+- ☐ No duplicate records are created.
+- ☐ Cron handles special event added after user selection correctly.
+- ☐ "All Off" records remain unchanged after cron.
+- ☐ Cron execution is logged.
 
 
 
 #### F. Data Integrity & Edge Cases
 
--  Unique constraint prevents duplicate (userId + date).
--  Invalid `userId` returns proper error.
--  Invalid date format returns 400.
--  System handles concurrent updates safely.
--  Deactivated users are excluded from cron processing.
--  Headcount excludes inactive and deleted users.
+- ☐ Unique constraint prevents duplicate (userId + date).
+- ☐ Invalid `userId` returns proper error.
+- ☐ Invalid date format returns 400.
+- ☐ System handles concurrent updates safely.
+- ☐ Deactivated users are excluded from cron processing.
+- ☐ Headcount excludes inactive and deleted users.
 
 
 ## 11. Operations
@@ -1192,18 +1472,18 @@ describe('POST /api/meals/my-record', () => {
 **Hosting Environment:**
 - **Backend**: cloud run / Vercel / Railway / Render (Node.js hosting)
 - **Frontend**: cloud run / Vercel / Netlify (Static hosting with CDN)
-- **Database**: Neon PostgreSQL (already cloud-hosted)
+- **Database**: cloud run / aws
 
 **Environment Separation:**
-- **Development**: Local backend + Neon dev database
-- **Staging**: Deployed backend + Neon staging database (separate instance)
-- **Production**: Deployed backend + Neon production database
+- **Development**: Local backend + postgres dev database
+- **Staging**: Deployed backend + postgres staging database (separate instance)
+- **Production**: Deployed backend + postgres production database
 
 ### 11.2 Environment Variables
 
 **Backend (.env):**
 ```
-DATABASE_URL=postgresql://user:pass@neon-prod.com/mhp_db
+DATABASE_URL=postgresql://user:pass@postgres-prod.com/mhp_db
 JWT_SECRET=<strong-random-secret-32-chars>
 NODE_ENV=production
 PORT=5000
@@ -1217,10 +1497,6 @@ VITE_ENV=production
 ```
 
 ### 11.3 Database Management
-
-**Backup Strategy:**
-- **Automated**: Neon provides daily automated backups (retained for 7 days on free tier)
-- **Manual**: Weekly export via `pg_dump` for long-term retention
 
 **Schema Updates:**
 1. Update `schema.prisma` in development
@@ -1260,8 +1536,7 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 **Scenarios and Plans:**
 
 **A. Database Corruption**
-- Restore from Neon automated backup (last 7 days)
-- If beyond 7 days: Restore from manual weekly export
+- Restore from manual weekly export
 - Estimated downtime: <1 hour
 
 **B. Backend Server Failure**
@@ -1269,12 +1544,7 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 - Update DNS if needed
 - Estimated downtime: <15 minutes (if using Vercel/Railway auto-scaling)
 
-**C. Neon Outage**
-- No immediate mitigation (cloud dependency)
-- Communicate to users: System unavailable
-- Estimated downtime: Per Neon SLA (99.9% uptime)
-
-**D. Data Loss (Accidental Deletion)**
+**C. Data Loss (Accidental Deletion)**
 - Admin accidentally deletes MealSchedule: Restore from database backup
 - Employee accidentally opts out: Team Lead can correct via proxy edit
 
@@ -1310,12 +1580,11 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
   - Employees can always manually add records (system doesn't fully break)
 
 **R2: Database Connection Pool Exhaustion**
-- **Description**: 100 concurrent users may exhaust Neon free tier connection limit 
+- **Description**: 100 concurrent users may exhaust connection limit
 - **Likelihood**: Medium (if all employees log in simultaneously)
 - **Impact**: Medium (API requests fail with 500 errors)
 - **Mitigation**:
   - Implement connection pooling in Prisma (reuse connections)
-  - Upgrade to Neon paid tier if needed  
   - Implement request queuing (retry logic)
 
 
@@ -1328,16 +1597,8 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
   - Test cron in staging with manual time adjustment
   - Monitor first week of production for anomalies
 
-**R4: Neon Free Tier Limits**
-- **Description**: Free tier storage fills up after 1 year
-- **Likelihood**: Medium (depends on retention policy)
-- **Impact**: Low (system stops writing new records)
-- **Mitigation**:
-  - Implement data archival (delete records >90 days)
-  - Upgrade to paid tier if needed 
-  - Monitor storage usage monthly
 
-**R6: Security Breach**
+**R5: Security Breach**
 - **Description**: Attacker gains access to admin account
 - **Likelihood**: Low (bcrypt hashing, JWT auth)
 - **Impact**: High (can modify all meal records)
@@ -1417,7 +1678,7 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 - **Accuracy**: Headcount variance ≤1% compared to actual attendance
 - **Stability**: Zero critical bugs causing system downtime
 
-### 13.2 Ongoing Success Metrics 
+### 13.2 Ongoing Success Metrics
 - Logistics team time savings: Target 90% time saving (from hours to minutes)
 - Headcount availability time: Target <5 minutes after 9 PM cutoff
 - Cron job success rate: Target >99%
@@ -1425,5 +1686,4 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 - API uptime: Target ≥99% during business hours
 
 ---
-
 
