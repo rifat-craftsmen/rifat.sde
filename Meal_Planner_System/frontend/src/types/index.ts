@@ -23,6 +23,7 @@ export interface MealRecord {
     iftar: boolean | null;
     eventDinner: boolean | null;
     optionalDinner: boolean | null;
+    workFromHome?: boolean;
     lastModifiedBy?: number;
     updatedAt: string;
 }
@@ -48,21 +49,44 @@ export interface DaySchedule {
 
 export interface HeadcountData {
     date: string;
-    lunch: number;
-    snacks: number;
-    iftar: number;
-    eventDinner: number;
-    optionalDinner: number;
-    totalEmployees: number;
+    mealTotals: {
+        lunch: number;
+        snacks: number;
+        iftar: number;
+        eventDinner: number;
+        optionalDinner: number;
+    };
+    teamBreakdown: Array<{
+        teamId: number;
+        teamName: string;
+        totalMeals: number;
+        lunch: number;
+        snacks: number;
+        iftar: number;
+        eventDinner: number;
+        optionalDinner: number;
+    }>;
+    workLocationSplit: {
+        office: number;
+        wfh: number;
+    };
+    overallTotal: number;
+    globalWFHActive?: boolean;
+    globalWFHNote?: string | null;
 }
 
 export interface MonthlyStats {
-    totalMeals: number;
-    lunchCount: number;
-    snacksCount: number;
-    iftarCount: number;
-    eventDinnerCount: number;
-    optionalDinnerCount: number;
+    month: string;
+    year: number;
+    mealsTaken: number;
+    totalMealsPlanned: number;
+    breakdown: {
+        lunch: number;
+        snacks: number;
+        iftar: number;
+        eventDinner: number;
+        optionalDinner: number;
+    };
 }
 
 export interface LoginCredentials {
@@ -113,4 +137,5 @@ export interface UpdateMealData {
     iftar: boolean | null;
     eventDinner: boolean | null;
     optionalDinner: boolean | null;
+    workFromHome?: boolean;
 }

@@ -9,6 +9,7 @@ import {
   getSchedule,
   deleteSchedule,
   getHeadcount,
+  getDailyParticipationData,
 } from '../controllers/adminController';
 import {
   createUserController,
@@ -58,5 +59,8 @@ router.delete('/meal-schedule/:id', authenticate, requireRole('ADMIN'), deleteSc
 
 // Headcount
 router.get('/headcount', authenticate, requireRole('ADMIN', 'LOGISTICS'), getHeadcount);
+
+// Daily participation
+router.get('/daily-participation', authenticate, requireRole('LEAD', 'ADMIN'), getDailyParticipationData);
 
 export default router;

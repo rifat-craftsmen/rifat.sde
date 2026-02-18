@@ -22,6 +22,7 @@ export const mealUpdateValidation = [
   body('iftar').optional({ nullable: true }).isBoolean(),
   body('eventDinner').optional({ nullable: true }).isBoolean(),
   body('optionalDinner').optional({ nullable: true }).isBoolean(),
+  body('workFromHome').optional().isBoolean(),
   validateRequest,
 ];
 
@@ -51,5 +52,22 @@ export const userUpdateValidation = [
   body('role').optional().isIn(['EMPLOYEE', 'LEAD', 'ADMIN', 'LOGISTICS']).withMessage('Valid role required'),
   body('teamId').optional(),
   body('status').optional().isIn(['ACTIVE', 'INACTIVE']).withMessage('Valid status required'),
+  validateRequest,
+];
+
+export const bulkMealUpdateValidation = [
+  body('userIds').isArray().withMessage('userIds must be an array'),
+  body('userIds.*').isInt().withMessage('Each userId must be an integer'),
+  body('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('Valid date in YYYY-MM-DD format required'),
+  body('action')
+    .isIn(['WFH_ALL', 'ALL_OFF', 'SET_ALL_MEALS', 'UNSET_ALL_MEALS'])
+    .withMessage('Invalid action'),
+  validateRequest,
+];
+
+export const globalWFHValidation = [
+  body('dateFrom').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('Valid dateFrom in YYYY-MM-DD format required'),
+  body('dateTo').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('Valid dateTo in YYYY-MM-DD format required'),
+  body('note').optional().isString(),
   validateRequest,
 ];

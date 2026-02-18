@@ -76,21 +76,35 @@ model MealRecord {
   id        Int      @id @default(autoincrement())
   userId    Int
   date      DateTime @db.Date
-  
+
   lunch          Boolean?
   snacks         Boolean?
   iftar          Boolean?
   eventDinner    Boolean?
   optionalDinner Boolean?
-  
+  workFromHome   Boolean  @default(false)
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   lastModifiedBy Int?
   notificationSent Boolean @default(false)
-  
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@unique([userId, date])
   @@index([date])
   @@index([userId])
+}
+
+model GlobalWFHPeriod {
+  id        Int      @id @default(autoincrement())
+  dateFrom  DateTime @db.Date
+  dateTo    DateTime @db.Date
+  note      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy Int
+
+  @@index([dateFrom, dateTo])
 }

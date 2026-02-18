@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { loginUser } from '../services/authService';
 import { AuthRequest } from '../types';
+import { prisma } from '../config/prismaClient.js';
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -26,6 +27,38 @@ export const logout = (req: Request, res: Response) => {
   return res.json({ success: true, message: 'Logged out successfully' });
 };
 
-export const getCurrentUser = (req: AuthRequest, res: Response) => {
-  return res.json({ user: req.user });
+export const getCurrentUser = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        status: true,
+        teamId: true,
+        team: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({ user });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to fetch user data' });
+  }
 };
