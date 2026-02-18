@@ -103,6 +103,7 @@ export const addOrUpdateMealRecord = async (
         iftar: data.iftar,
         eventDinner: data.eventDinner,
         optionalDinner: data.optionalDinner,
+        workFromHome: data.workFromHome ?? existingRecord.workFromHome,
         lastModifiedBy: modifiedBy || null,
         notificationSent: false,
       },
@@ -118,6 +119,7 @@ export const addOrUpdateMealRecord = async (
         iftar: data.iftar,
         eventDinner: data.eventDinner,
         optionalDinner: data.optionalDinner,
+        workFromHome: data.workFromHome ?? false,
         lastModifiedBy: modifiedBy || null,
         notificationSent: false,
       },
@@ -131,6 +133,7 @@ export const addOrUpdateMealRecord = async (
 // Get monthly stats
 export const getMyStats = async (userId: number) => {
   const { start, end } = getCurrentMonthRange();
+  const today = formatDateForDB(new Date());
 
   const records = await prisma.mealRecord.findMany({
     where: {
@@ -142,7 +145,23 @@ export const getMyStats = async (userId: number) => {
     },
   });
 
-  const totalMeals = records.reduce((sum, record) => {
+  // Filter records for past + today only (taken meals)
+  const takenRecords = records.filter((r) => r.date.getTime() <= today.getTime());
+
+  // Calculate total meals taken (past + today)
+  const mealsTaken = takenRecords.reduce((sum, record) => {
+    return (
+      sum +
+      (record.lunch ? 1 : 0) +
+      (record.snacks ? 1 : 0) +
+      (record.iftar ? 1 : 0) +
+      (record.eventDinner ? 1 : 0) +
+      (record.optionalDinner ? 1 : 0)
+    );
+  }, 0);
+
+  // Calculate total meals planned (all records including future)
+  const totalMealsPlanned = records.reduce((sum, record) => {
     return (
       sum +
       (record.lunch ? 1 : 0) +
@@ -156,13 +175,14 @@ export const getMyStats = async (userId: number) => {
   return {
     month: start.toLocaleString('default', { month: 'long' }),
     year: start.getFullYear(),
-    totalMeals,
+    mealsTaken,
+    totalMealsPlanned,
     breakdown: {
-      lunch: records.filter((r) => r.lunch).length,
-      snacks: records.filter((r) => r.snacks).length,
-      iftar: records.filter((r) => r.iftar).length,
-      eventDinner: records.filter((r) => r.eventDinner).length,
-      optionalDinner: records.filter((r) => r.optionalDinner).length,
+      lunch: takenRecords.filter((r) => r.lunch).length,
+      snacks: takenRecords.filter((r) => r.snacks).length,
+      iftar: takenRecords.filter((r) => r.iftar).length,
+      eventDinner: takenRecords.filter((r) => r.eventDinner).length,
+      optionalDinner: takenRecords.filter((r) => r.optionalDinner).length,
     },
   };
 };

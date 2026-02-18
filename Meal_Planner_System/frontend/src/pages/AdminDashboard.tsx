@@ -4,8 +4,9 @@ import UserManagementTab from '../components/admin/UserManagementTab';
 import ScheduleManagementTab from '../components/admin/ScheduleManagementTab';
 import EmployeeProxyTab from '../components/admin/EmployeeProxyTab';
 import HeadcountReportsTab from '../components/admin/HeadcountReportsTab';
+import DailyParticipationTab from '../components/shared/DailyParticipationTab';
 
-type TabType = 'users' | 'schedules' | 'proxy' | 'headcount';
+type TabType = 'users' | 'schedules' | 'proxy' | 'headcount' | 'participation';
 
 const AdminDashboard: React.FC = () => {
     const { user, logout } = useAuth();
@@ -24,6 +25,7 @@ const AdminDashboard: React.FC = () => {
         { id: 'schedules' as TabType, label: 'Schedule Management', icon: '📅' },
         { id: 'proxy' as TabType, label: 'Employee Proxy', icon: '✏️' },
         { id: 'headcount' as TabType, label: 'Headcount Reports', icon: '📊' },
+        { id: 'participation' as TabType, label: 'Daily Participation', icon: '📋' },
     ];
 
     return (
@@ -72,6 +74,7 @@ const AdminDashboard: React.FC = () => {
                     {activeTab === 'schedules' && <ScheduleManagementTab />}
                     {activeTab === 'proxy' && <EmployeeProxyTab />}
                     {activeTab === 'headcount' && <HeadcountReportsTab />}
+                    {activeTab === 'participation' && <DailyParticipationTab teamScope={false} />}
                 </div>
             </div>
         </div>
