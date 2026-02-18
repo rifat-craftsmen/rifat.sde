@@ -20,6 +20,7 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({ isOpen, onClo
         optionalDinnerEnabled: true,
         occasionName: '',
     });
+    const [occasionInputType, setOccasionInputType] = useState<'preset' | 'custom'>('preset');
 
     const createMutation = useMutation({
         mutationFn: async (data: CreateScheduleData) => {
@@ -46,6 +47,7 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({ isOpen, onClo
             optionalDinnerEnabled: true,
             occasionName: '',
         });
+        setOccasionInputType('preset');
         createMutation.reset();
         onClose();
     };
@@ -77,14 +79,36 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({ isOpen, onClo
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Occasion Name (Optional)</label>
-                        <input
-                            type="text"
-                            value={formData.occasionName}
-                            onChange={(e) => setFormData({ ...formData, occasionName: e.target.value })}
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Occasion Type (Optional)</label>
+                        <select
+                            value={occasionInputType === 'custom' ? 'custom' : formData.occasionName || ''}
+                            onChange={(e) => {
+                                if (e.target.value === 'custom') {
+                                    setOccasionInputType('custom');
+                                    setFormData({ ...formData, occasionName: '' });
+                                } else {
+                                    setOccasionInputType('preset');
+                                    setFormData({ ...formData, occasionName: e.target.value });
+                                }
+                            }}
                             className="input-field"
-                            placeholder="e.g., Company Anniversary"
-                        />
+                        >
+                            <option value="">None</option>
+                            <option value="Office Closed">Office Closed</option>
+                            <option value="Government Holiday">Government Holiday</option>
+                            <option value="Special Celebration">Special Celebration</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+
+                        {occasionInputType === 'custom' && (
+                            <input
+                                type="text"
+                                value={formData.occasionName}
+                                onChange={(e) => setFormData({ ...formData, occasionName: e.target.value })}
+                                className="input-field mt-2"
+                                placeholder="Enter custom occasion name"
+                            />
+                        )}
                     </div>
 
                     <div className="space-y-2">

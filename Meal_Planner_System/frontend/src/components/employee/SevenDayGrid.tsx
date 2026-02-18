@@ -48,6 +48,7 @@ const SevenDayGrid: React.FC = () => {
                             iftar: newData.iftar,
                             eventDinner: newData.eventDinner,
                             optionalDinner: newData.optionalDinner,
+                            workFromHome: newData.workFromHome ?? day.record?.workFromHome ?? false,
                             lastModifiedBy: day.record?.lastModifiedBy,
                             updatedAt: new Date().toISOString(),
                         };
@@ -122,6 +123,23 @@ const SevenDayGrid: React.FC = () => {
         });
     };
 
+    const handleWFH = (date: string) => {
+        const dayData = schedule?.find((d) => d.date === date);
+        if (!dayData || dayData.isPast) return;
+
+        const dateString = extractDateString(date);
+
+        updateMealMutation.mutate({
+            date: dateString,
+            lunch: false,
+            snacks: false,
+            iftar: false,
+            eventDinner: false,
+            optionalDinner: false,
+            workFromHome: true,
+        });
+    };
+
     if (isLoading) {
         return (
             <div className="card">
@@ -174,16 +192,30 @@ const SevenDayGrid: React.FC = () => {
                                             {mealSchedule.occasionName}
                                         </span>
                                     )}
+                                    {day.record?.workFromHome && (
+                                        <span className="inline-block mt-1 ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">
+                                            Work From Home
+                                        </span>
+                                    )}
                                 </div>
 
                                 {!isDisabled && (
-                                    <button
-                                        onClick={() => handleAllOff(day.date)}
-                                        className="px-4 py-2 font-medium text-sm bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white rounded-lg transition-colors duration-200 active:scale-95"
-                                        disabled={updateMealMutation.isPending}
-                                    >
-                                        All Off
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleAllOff(day.date)}
+                                            className="px-4 py-2 font-medium text-sm bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white rounded-lg transition-colors duration-200 active:scale-95"
+                                            disabled={updateMealMutation.isPending}
+                                        >
+                                            All Off
+                                        </button>
+                                        <button
+                                            onClick={() => handleWFH(day.date)}
+                                            className="px-4 py-2 font-medium text-sm bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 active:scale-95"
+                                            disabled={updateMealMutation.isPending}
+                                        >
+                                            WFH
+                                        </button>
+                                    </div>
                                 )}
                             </div>
 
