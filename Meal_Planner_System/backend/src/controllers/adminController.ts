@@ -9,6 +9,10 @@ import {
     deleteMealSchedule,
     getDailyHeadcount,
     getDailyParticipation,
+    bulkUpdateMeals,
+    createGlobalWFHPeriod,
+    getAllGlobalWFHPeriods,
+    deleteGlobalWFHPeriod,
 } from '../services/adminService';
 import { getMySchedule, addOrUpdateMealRecord } from '../services/mealService';
 
@@ -129,6 +133,52 @@ export const getDailyParticipationData = async (req: AuthRequest, res: Response)
 
         const participation = await getDailyParticipation(date, teamId);
         return res.json(participation);
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const bulkUpdateMealsController = async (req: AuthRequest, res: Response) => {
+    try {
+        const modifiedBy = req.user!.userId;
+        const userRole = req.user!.role;
+        const userTeamId = req.user!.teamId;
+
+        // Team leads can only update employees in their own team
+        const teamScope = userRole === 'LEAD' ? userTeamId : undefined;
+
+        const result = await bulkUpdateMeals(req.body, modifiedBy, teamScope);
+        return res.json({ success: true, ...result });
+    } catch (error: any) {
+        return res.status(400).json({ error: error.message });
+    }
+};
+
+export const createGlobalWFHController = async (req: AuthRequest, res: Response) => {
+    try {
+        const createdBy = req.user!.userId;
+        const period = await createGlobalWFHPeriod(req.body, createdBy);
+        return res.json({ success: true, period });
+    } catch (error: any) {
+        return res.status(400).json({ error: error.message });
+    }
+};
+
+export const getGlobalWFHController = async (_req: AuthRequest, res: Response) => {
+    try {
+        const periods = await getAllGlobalWFHPeriods();
+        return res.json({ periods });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const deleteGlobalWFHController = async (req: AuthRequest, res: Response) => {
+    try {
+        const idParam = req.params.id;
+        const id = parseInt(Array.isArray(idParam) ? idParam[0] : idParam);
+        await deleteGlobalWFHPeriod(id);
+        return res.json({ success: true });
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
     }

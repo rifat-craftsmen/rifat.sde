@@ -48,7 +48,7 @@ const MonthlyStatsCard: React.FC = () => {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     {/* Meals Taken */}
                     <div>
                         <p className="text-primary-100 text-sm font-medium mb-1">Meals Taken</p>
@@ -60,6 +60,20 @@ const MonthlyStatsCard: React.FC = () => {
                     <div>
                         <p className="text-primary-100 text-sm font-medium mb-1">Total Planned</p>
                         <h2 className="text-4xl font-bold">{stats?.totalMealsPlanned || 0}</h2>
+                        <p className="text-primary-100 text-xs mt-1">Including future</p>
+                    </div>
+
+                    {/* WFH Taken */}
+                    <div>
+                        <p className="text-primary-100 text-sm font-medium mb-1">🏠 WFH Taken</p>
+                        <h2 className="text-4xl font-bold">{stats?.wfhTaken || 0}</h2>
+                        <p className="text-primary-100 text-xs mt-1">Up to today</p>
+                    </div>
+
+                    {/* WFH Planned */}
+                    <div>
+                        <p className="text-primary-100 text-sm font-medium mb-1">🏠 WFH Planned</p>
+                        <h2 className="text-4xl font-bold">{stats?.wfhCount || 0}</h2>
                         <p className="text-primary-100 text-xs mt-1">Including future</p>
                     </div>
                 </div>

@@ -28,6 +28,14 @@ export const getMySchedule = async (userId: number, startDate?: Date) => {
     },
   });
 
+  // Get global WFH periods that overlap with this window
+  const globalWFHPeriods = await prisma.globalWFHPeriod.findMany({
+    where: {
+      dateFrom: { lte: end },
+      dateTo: { gte: start },
+    },
+  });
+
   // Build 7-day grid
   const scheduleArray = [];
   const today = formatDateForDB(new Date());
@@ -39,11 +47,15 @@ export const getMySchedule = async (userId: number, startDate?: Date) => {
 
     const record = records.find((r) => r.date.getTime() === formattedDate.getTime());
     const schedule = schedules.find((s) => s.date.getTime() === formattedDate.getTime());
+    const isGlobalWFH = globalWFHPeriods.some(
+      (p) => formattedDate.getTime() >= p.dateFrom.getTime() && formattedDate.getTime() <= p.dateTo.getTime()
+    );
 
     scheduleArray.push({
       date: formattedDate.toISOString(),
       isToday: formattedDate.getTime() === today.getTime(),
       isPast: formattedDate.getTime() < today.getTime(),
+      globalWFH: isGlobalWFH,
       record: record || null,
       schedule: {
         lunchEnabled: schedule?.lunchEnabled ?? true,
@@ -71,6 +83,17 @@ export const addOrUpdateMealRecord = async (
   // Validate date is in valid window
   if (!isDateInValidWindow(targetDate)) {
     throw new Error('Can only add/edit meals for next 7 days');
+  }
+
+  // Check if this date falls within a global WFH period
+  const globalWFH = await prisma.globalWFHPeriod.findFirst({
+    where: {
+      dateFrom: { lte: targetDate },
+      dateTo: { gte: targetDate },
+    },
+  });
+  if (globalWFH) {
+    throw new Error('This is a company-wide WFH day. Meal changes are not allowed.');
   }
 
   // Get meal schedule for this date (if exists)
@@ -172,11 +195,19 @@ export const getMyStats = async (userId: number) => {
     );
   }, 0);
 
+  // WFH days taken — past + today only
+  const wfhTaken = takenRecords.filter((r) => r.workFromHome).length;
+
+  // WFH days planned — all records this month including future
+  const wfhCount = records.filter((r) => r.workFromHome).length;
+
   return {
     month: start.toLocaleString('default', { month: 'long' }),
     year: start.getFullYear(),
     mealsTaken,
     totalMealsPlanned,
+    wfhTaken,
+    wfhCount,
     breakdown: {
       lunch: takenRecords.filter((r) => r.lunch).length,
       snacks: takenRecords.filter((r) => r.snacks).length,

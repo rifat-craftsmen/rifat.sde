@@ -164,7 +164,8 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
             <div className="space-y-3">
                 {schedule?.map((day) => {
                     const mealSchedule = day.schedule;
-                    const isDisabled = day.isToday || day.isPast;
+                    const isGlobalWFH = day.globalWFH ?? false;
+                    const isDisabled = day.isToday || day.isPast || isGlobalWFH;
 
                     // Default to true for any meal that is enabled in the schedule but has no record yet
                     const lunch = mealSchedule?.lunchEnabled !== false ? (day.record?.lunch ?? true) : null;
@@ -176,10 +177,13 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
                     return (
                         <div
                             key={day.date}
-                            className={`p-4 rounded-lg border-2 transition-all ${isDisabled
-                                ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-60'
-                                : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 hover:border-primary-300'
-                                }`}
+                            className={`p-4 rounded-lg border-2 transition-all ${
+                                isGlobalWFH
+                                    ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-300 dark:border-amber-700 opacity-80'
+                                    : isDisabled
+                                        ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-60'
+                                        : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 hover:border-primary-300'
+                            }`}
                         >
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -197,7 +201,12 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
                                             {mealSchedule.occasionName}
                                         </span>
                                     )}
-                                    {day.record?.workFromHome && (
+                                    {isGlobalWFH && (
+                                        <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs rounded-full font-medium">
+                                            🏠 Company WFH
+                                        </span>
+                                    )}
+                                    {!isGlobalWFH && day.record?.workFromHome && (
                                         <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">
                                             🏠 WFH
                                         </span>
@@ -228,72 +237,78 @@ const ProxySevenDayGrid: React.FC<ProxySevenDayGridProps> = ({ userId, userName 
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                {mealSchedule?.lunchEnabled !== false && (
-                                    <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={lunch ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'lunch')}
-                                            disabled={isDisabled || updateMealMutation.isPending}
-                                            className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
-                                        />
-                                        <span className="text-sm text-slate-700 dark:text-slate-300">Lunch</span>
-                                    </label>
-                                )}
+                            {isGlobalWFH ? (
+                                <p className="text-sm text-amber-700 dark:text-amber-400">
+                                    All meals are unavailable — company-wide WFH day.
+                                </p>
+                            ) : (
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                    {mealSchedule?.lunchEnabled !== false && (
+                                        <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={lunch ?? false}
+                                                onChange={() => handleMealToggle(day.date, 'lunch')}
+                                                disabled={isDisabled || updateMealMutation.isPending}
+                                                className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
+                                            />
+                                            <span className="text-sm text-slate-700 dark:text-slate-300">Lunch</span>
+                                        </label>
+                                    )}
 
-                                {mealSchedule?.snacksEnabled !== false && (
-                                    <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={snacks ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'snacks')}
-                                            disabled={isDisabled || updateMealMutation.isPending}
-                                            className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
-                                        />
-                                        <span className="text-sm text-slate-700 dark:text-slate-300">Snacks</span>
-                                    </label>
-                                )}
+                                    {mealSchedule?.snacksEnabled !== false && (
+                                        <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={snacks ?? false}
+                                                onChange={() => handleMealToggle(day.date, 'snacks')}
+                                                disabled={isDisabled || updateMealMutation.isPending}
+                                                className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
+                                            />
+                                            <span className="text-sm text-slate-700 dark:text-slate-300">Snacks</span>
+                                        </label>
+                                    )}
 
-                                {mealSchedule?.iftarEnabled && (
-                                    <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={iftar ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'iftar')}
-                                            disabled={isDisabled || updateMealMutation.isPending}
-                                            className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
-                                        />
-                                        <span className="text-sm text-slate-700 dark:text-slate-300">Iftar</span>
-                                    </label>
-                                )}
+                                    {mealSchedule?.iftarEnabled && (
+                                        <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={iftar ?? false}
+                                                onChange={() => handleMealToggle(day.date, 'iftar')}
+                                                disabled={isDisabled || updateMealMutation.isPending}
+                                                className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
+                                            />
+                                            <span className="text-sm text-slate-700 dark:text-slate-300">Iftar</span>
+                                        </label>
+                                    )}
 
-                                {mealSchedule?.eventDinnerEnabled && (
-                                    <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={eventDinner ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'eventDinner')}
-                                            disabled={isDisabled || updateMealMutation.isPending}
-                                            className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
-                                        />
-                                        <span className="text-sm text-slate-700 dark:text-slate-300">Event Dinner</span>
-                                    </label>
-                                )}
+                                    {mealSchedule?.eventDinnerEnabled && (
+                                        <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={eventDinner ?? false}
+                                                onChange={() => handleMealToggle(day.date, 'eventDinner')}
+                                                disabled={isDisabled || updateMealMutation.isPending}
+                                                className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
+                                            />
+                                            <span className="text-sm text-slate-700 dark:text-slate-300">Event Dinner</span>
+                                        </label>
+                                    )}
 
-                                {mealSchedule?.optionalDinnerEnabled !== false && (
-                                    <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={optionalDinner ?? false}
-                                            onChange={() => handleMealToggle(day.date, 'optionalDinner')}
-                                            disabled={isDisabled || updateMealMutation.isPending}
-                                            className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
-                                        />
-                                        <span className="text-sm text-slate-700 dark:text-slate-300">Optional Dinner</span>
-                                    </label>
-                                )}
-                            </div>
+                                    {mealSchedule?.optionalDinnerEnabled !== false && (
+                                        <label className={`flex items-center space-x-2 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={optionalDinner ?? false}
+                                                onChange={() => handleMealToggle(day.date, 'optionalDinner')}
+                                                disabled={isDisabled || updateMealMutation.isPending}
+                                                className="w-5 h-5 text-primary-600 rounded focus:ring-primary-500"
+                                            />
+                                            <span className="text-sm text-slate-700 dark:text-slate-300">Optional Dinner</span>
+                                        </label>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     );
                 })}

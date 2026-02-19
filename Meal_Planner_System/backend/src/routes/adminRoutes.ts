@@ -10,6 +10,10 @@ import {
   deleteSchedule,
   getHeadcount,
   getDailyParticipationData,
+  bulkUpdateMealsController,
+  createGlobalWFHController,
+  getGlobalWFHController,
+  deleteGlobalWFHController,
 } from '../controllers/adminController';
 import {
   createUserController,
@@ -20,7 +24,7 @@ import {
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/authorize';
 import { requireTeamAccess } from '../middleware/teamAccess';
-import { mealUpdateValidation, scheduleValidation, userCreationValidation, userUpdateValidation } from '../middleware/validation';
+import { mealUpdateValidation, scheduleValidation, userCreationValidation, userUpdateValidation, bulkMealUpdateValidation, globalWFHValidation } from '../middleware/validation';
 
 const router = Router();
 
@@ -62,5 +66,13 @@ router.get('/headcount', authenticate, requireRole('ADMIN', 'LOGISTICS'), getHea
 
 // Daily participation
 router.get('/daily-participation', authenticate, requireRole('LEAD', 'ADMIN'), getDailyParticipationData);
+
+// Bulk meal operations
+router.post('/meals/bulk-update', authenticate, requireRole('LEAD', 'ADMIN'), bulkMealUpdateValidation, bulkUpdateMealsController);
+
+// Global WFH management (Admin only)
+router.post('/global-wfh', authenticate, requireRole('ADMIN'), globalWFHValidation, createGlobalWFHController);
+router.get('/global-wfh', authenticate, requireRole('ADMIN'), getGlobalWFHController);
+router.delete('/global-wfh/:id', authenticate, requireRole('ADMIN'), deleteGlobalWFHController);
 
 export default router;

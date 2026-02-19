@@ -1,6 +1,6 @@
 import { prisma } from '../config/prismaClient.js';
 import { formatDateForDB, parseDateString } from '../utils/dateHelpers';
-import { CreateScheduleData } from '../types';
+import { CreateScheduleData, BulkMealUpdateData, CreateGlobalWFHData } from '../types';
 
 // Get all teams
 export const getAllTeams = async () => {
@@ -264,4 +264,154 @@ export const getDailyParticipation = async (date: Date, teamId?: number) => {
       };
     })
   };
+};
+
+// Bulk update meals for multiple employees
+export const bulkUpdateMeals = async (
+  data: BulkMealUpdateData,
+  modifiedBy: number,
+  requesterTeamId?: number
+) => {
+  const targetDate = parseDateString(data.date);
+
+  // Team leads: verify all userIds belong to their team
+  if (requesterTeamId) {
+    const teamMembers = await prisma.user.findMany({
+      where: { teamId: requesterTeamId, id: { in: data.userIds } },
+      select: { id: true },
+    });
+    const validIds = new Set(teamMembers.map((m) => m.id));
+    const invalid = data.userIds.filter((id) => !validIds.has(id));
+    if (invalid.length > 0) {
+      throw new Error('Some employees are not in your team');
+    }
+  }
+
+  // Get meal schedule for the date to know which meals are enabled
+  const schedule = await prisma.mealSchedule.findUnique({
+    where: { date: targetDate },
+  });
+
+  let mealData: {
+    lunch: boolean;
+    snacks: boolean;
+    iftar: boolean;
+    eventDinner: boolean;
+    optionalDinner: boolean;
+    workFromHome: boolean;
+  };
+
+  switch (data.action) {
+    case 'WFH_ALL':
+      mealData = { lunch: false, snacks: false, iftar: false, eventDinner: false, optionalDinner: false, workFromHome: true };
+      break;
+    case 'ALL_OFF':
+      mealData = { lunch: false, snacks: false, iftar: false, eventDinner: false, optionalDinner: false, workFromHome: false };
+      break;
+    case 'SET_ALL_MEALS':
+      mealData = {
+        lunch: schedule?.lunchEnabled !== false,
+        snacks: schedule?.snacksEnabled !== false,
+        iftar: schedule?.iftarEnabled ?? false,
+        eventDinner: schedule?.eventDinnerEnabled ?? false,
+        optionalDinner: schedule?.optionalDinnerEnabled ?? false,
+        workFromHome: false,
+      };
+      break;
+    case 'UNSET_ALL_MEALS':
+      mealData = { lunch: false, snacks: false, iftar: false, eventDinner: false, optionalDinner: false, workFromHome: false };
+      break;
+  }
+
+  // Upsert records for all selected users in parallel
+  const results = await Promise.all(
+    data.userIds.map((userId) =>
+      prisma.mealRecord.upsert({
+        where: { userId_date: { userId, date: targetDate } },
+        update: { ...mealData, lastModifiedBy: modifiedBy, notificationSent: false },
+        create: { userId, date: targetDate, ...mealData, lastModifiedBy: modifiedBy },
+      })
+    )
+  );
+
+  return { updated: results.length };
+};
+
+// Create a global WFH period.
+// Only writes records for TODAY if today falls within the period.
+// Future dates are handled day-by-day by the nightly cron job.
+export const createGlobalWFHPeriod = async (data: CreateGlobalWFHData, createdBy: number) => {
+  const dateFrom = parseDateString(data.dateFrom);
+  const dateTo = parseDateString(data.dateTo);
+
+  if (dateTo < dateFrom) {
+    throw new Error('End date must be on or after start date');
+  }
+
+  // Create the period record
+  const period = await prisma.globalWFHPeriod.create({
+    data: {
+      dateFrom,
+      dateTo,
+      note: data.note || null,
+      createdBy,
+    },
+  });
+
+  // If today falls within the period, immediately upsert WFH records for all active employees.
+  // Future dates will be picked up by the nightly cron at 9 PM.
+  const today = formatDateForDB(new Date());
+  const isToday = today.getTime() >= dateFrom.getTime() && today.getTime() <= dateTo.getTime();
+
+  if (isToday) {
+    const activeUsers = await prisma.user.findMany({
+      where: { status: 'ACTIVE' },
+      select: { id: true },
+    });
+
+    await Promise.all(
+      activeUsers.map((user) =>
+        prisma.mealRecord.upsert({
+          where: { userId_date: { userId: user.id, date: today } },
+          update: {
+            workFromHome: true,
+            lunch: false,
+            snacks: false,
+            iftar: false,
+            eventDinner: false,
+            optionalDinner: false,
+            lastModifiedBy: createdBy,
+            notificationSent: false,
+          },
+          create: {
+            userId: user.id,
+            date: today,
+            workFromHome: true,
+            lunch: false,
+            snacks: false,
+            iftar: false,
+            eventDinner: false,
+            optionalDinner: false,
+            lastModifiedBy: createdBy,
+          },
+        })
+      )
+    );
+  }
+
+  return period;
+};
+
+// Get all global WFH periods
+export const getAllGlobalWFHPeriods = async () => {
+  return await prisma.globalWFHPeriod.findMany({
+    orderBy: { dateFrom: 'desc' },
+  });
+};
+
+// Delete a global WFH period
+export const deleteGlobalWFHPeriod = async (id: number) => {
+  return await prisma.globalWFHPeriod.delete({
+    where: { id },
+  });
 };
