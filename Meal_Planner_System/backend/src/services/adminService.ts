@@ -1,6 +1,6 @@
 import { prisma } from '../config/prismaClient.js';
 import { formatDateForDB, parseDateString } from '../utils/dateHelpers';
-import { CreateScheduleData } from '../types';
+import { CreateScheduleData, BulkMealUpdateData } from '../types';
 
 // Get all teams
 export const getAllTeams = async () => {
@@ -264,4 +264,75 @@ export const getDailyParticipation = async (date: Date, teamId?: number) => {
       };
     })
   };
+};
+
+// Bulk update meals for multiple employees
+export const bulkUpdateMeals = async (
+  data: BulkMealUpdateData,
+  modifiedBy: number,
+  requesterTeamId?: number
+) => {
+  const targetDate = parseDateString(data.date);
+
+  // Team leads: verify all userIds belong to their team
+  if (requesterTeamId) {
+    const teamMembers = await prisma.user.findMany({
+      where: { teamId: requesterTeamId, id: { in: data.userIds } },
+      select: { id: true },
+    });
+    const validIds = new Set(teamMembers.map((m) => m.id));
+    const invalid = data.userIds.filter((id) => !validIds.has(id));
+    if (invalid.length > 0) {
+      throw new Error('Some employees are not in your team');
+    }
+  }
+
+  // Get meal schedule for the date to know which meals are enabled
+  const schedule = await prisma.mealSchedule.findUnique({
+    where: { date: targetDate },
+  });
+
+  let mealData: {
+    lunch: boolean;
+    snacks: boolean;
+    iftar: boolean;
+    eventDinner: boolean;
+    optionalDinner: boolean;
+    workFromHome: boolean;
+  };
+
+  switch (data.action) {
+    case 'WFH_ALL':
+      mealData = { lunch: false, snacks: false, iftar: false, eventDinner: false, optionalDinner: false, workFromHome: true };
+      break;
+    case 'ALL_OFF':
+      mealData = { lunch: false, snacks: false, iftar: false, eventDinner: false, optionalDinner: false, workFromHome: false };
+      break;
+    case 'SET_ALL_MEALS':
+      mealData = {
+        lunch: schedule?.lunchEnabled !== false,
+        snacks: schedule?.snacksEnabled !== false,
+        iftar: schedule?.iftarEnabled ?? false,
+        eventDinner: schedule?.eventDinnerEnabled ?? false,
+        optionalDinner: schedule?.optionalDinnerEnabled ?? false,
+        workFromHome: false,
+      };
+      break;
+    case 'UNSET_ALL_MEALS':
+      mealData = { lunch: false, snacks: false, iftar: false, eventDinner: false, optionalDinner: false, workFromHome: false };
+      break;
+  }
+
+  // Upsert records for all selected users in parallel
+  const results = await Promise.all(
+    data.userIds.map((userId) =>
+      prisma.mealRecord.upsert({
+        where: { userId_date: { userId, date: targetDate } },
+        update: { ...mealData, lastModifiedBy: modifiedBy, notificationSent: false },
+        create: { userId, date: targetDate, ...mealData, lastModifiedBy: modifiedBy },
+      })
+    )
+  );
+
+  return { updated: results.length };
 };
