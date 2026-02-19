@@ -4,8 +4,56 @@ import api from '../../services/api';
 import type { HeadcountData } from '../../types';
 import { formatDateForAPI } from '../../utils/dateHelpers';
 
+const formatAnnouncement = (headcount: HeadcountData, selectedDate: string): string => {
+    const dateStr = new Date(selectedDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'UTC',
+    });
+
+    const lines: string[] = [];
+
+    lines.push(`📅 Meal Headcount — ${dateStr}`);
+    lines.push('');
+
+    if (headcount.globalWFHActive) {
+        lines.push('🏠 Global WFH Period Active');
+        if (headcount.globalWFHNote) lines.push(`   Note: ${headcount.globalWFHNote}`);
+        lines.push('');
+    }
+
+    lines.push('🍽️ Meal Headcount:');
+    if (headcount.mealTotals.lunch > 0) lines.push(`   🍱 Lunch: ${headcount.mealTotals.lunch} people`);
+    if (headcount.mealTotals.snacks > 0) lines.push(`   🍪 Snacks: ${headcount.mealTotals.snacks} people`);
+    if (headcount.mealTotals.iftar > 0) lines.push(`   🌙 Iftar: ${headcount.mealTotals.iftar} people`);
+    if (headcount.mealTotals.eventDinner > 0) lines.push(`   🎉 Event Dinner: ${headcount.mealTotals.eventDinner} people`);
+    if (headcount.mealTotals.optionalDinner > 0) lines.push(`   🍽️ Optional Dinner: ${headcount.mealTotals.optionalDinner} people`);
+    lines.push('');
+
+    lines.push(`📊 Total Meals: ${headcount.overallTotal}`);
+    lines.push('');
+
+    lines.push('📍 Work Location:');
+    lines.push(`   🏢 Office: ${headcount.workLocationSplit.office} people`);
+    lines.push(`   🏠 WFH: ${headcount.workLocationSplit.wfh} people`);
+
+    if (headcount.teamBreakdown.length > 0) {
+        lines.push('');
+        lines.push('👥 Team Breakdown:');
+        headcount.teamBreakdown.forEach((team) => {
+            lines.push(`   ${team.teamName}: ${team.totalMeals} meals`);
+        });
+    }
+
+    return lines.join('\n');
+};
+
 const HeadcountReportsTab: React.FC = () => {
     const [selectedDate, setSelectedDate] = useState(formatDateForAPI(new Date()));
+    const [showModal, setShowModal] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     const { data: headcount, isLoading } = useQuery<HeadcountData>({
         queryKey: ['admin-headcount', selectedDate],
@@ -23,11 +71,66 @@ const HeadcountReportsTab: React.FC = () => {
         { label: 'Optional Dinner', count: headcount?.mealTotals.optionalDinner || 0, color: 'from-orange-500 to-orange-600', icon: '🍽️' },
     ];
 
+    const handleCopy = () => {
+        if (!headcount) return;
+        navigator.clipboard.writeText(formatAnnouncement(headcount, selectedDate));
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Headcount Reports</h2>
+                {headcount && (
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                        📣 Generate Announcement
+                    </button>
+                )}
             </div>
+
+            {/* Announcement Modal */}
+            {showModal && headcount && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-white">Daily Announcement</h3>
+                            <button
+                                onClick={() => { setShowModal(false); setCopied(false); }}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-2xl leading-none"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <textarea
+                            readOnly
+                            value={formatAnnouncement(headcount, selectedDate)}
+                            className="w-full h-72 p-3 text-sm font-mono bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg resize-none focus:outline-none"
+                        />
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button
+                                onClick={() => { setShowModal(false); setCopied(false); }}
+                                className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white transition-colors"
+                            >
+                                Close
+                            </button>
+                            <button
+                                onClick={handleCopy}
+                                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                    copied
+                                        ? 'bg-green-500 text-white'
+                                        : 'bg-primary-600 hover:bg-primary-700 text-white'
+                                }`}
+                            >
+                                {copied ? '✓ Copied!' : 'Copy to Clipboard'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Date Picker */}
             <div className="mb-6 p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
