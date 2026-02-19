@@ -45,6 +45,7 @@ export interface DaySchedule {
     schedule?: MealSchedule;
     isToday: boolean;
     isPast: boolean;
+    globalWFH?: boolean;
 }
 
 export interface HeadcountData {
@@ -80,6 +81,8 @@ export interface MonthlyStats {
     year: number;
     mealsTaken: number;
     totalMealsPlanned: number;
+    wfhTaken: number;
+    wfhCount: number;
     breakdown: {
         lunch: number;
         snacks: number;
@@ -138,4 +141,12 @@ export interface UpdateMealData {
     eventDinner: boolean | null;
     optionalDinner: boolean | null;
     workFromHome?: boolean;
+}
+
+export interface GlobalWFHPeriod {
+    id: number;
+    dateFrom: string;
+    dateTo: string;
+    note: string | null;
+    createdAt: string;
 }

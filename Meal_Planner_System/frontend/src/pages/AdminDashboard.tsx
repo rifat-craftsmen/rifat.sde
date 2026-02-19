@@ -4,10 +4,11 @@ import UserManagementTab from '../components/admin/UserManagementTab';
 import ScheduleManagementTab from '../components/admin/ScheduleManagementTab';
 import EmployeeProxyTab from '../components/admin/EmployeeProxyTab';
 import HeadcountReportsTab from '../components/admin/HeadcountReportsTab';
+import GlobalWFHTab from '../components/admin/GlobalWFHTab';
 import DailyParticipationTab from '../components/shared/DailyParticipationTab';
 import SevenDayGrid from '../components/employee/SevenDayGrid';
 
-type TabType = 'my-meals' | 'users' | 'schedules' | 'proxy' | 'headcount' | 'participation';
+type TabType = 'my-meals' | 'users' | 'schedules' | 'proxy' | 'headcount' | 'participation' | 'global-wfh';
 
 const AdminDashboard: React.FC = () => {
     const { user, logout } = useAuth();
@@ -28,6 +29,7 @@ const AdminDashboard: React.FC = () => {
         { id: 'proxy' as TabType, label: 'Employee Proxy', icon: '✏️' },
         { id: 'headcount' as TabType, label: 'Headcount Reports', icon: '📊' },
         { id: 'participation' as TabType, label: 'Daily Participation', icon: '📋' },
+        { id: 'global-wfh' as TabType, label: 'Global WFH', icon: '🏠' },
     ];
 
     return (
@@ -78,6 +80,7 @@ const AdminDashboard: React.FC = () => {
                     {activeTab === 'proxy' && <EmployeeProxyTab />}
                     {activeTab === 'headcount' && <HeadcountReportsTab />}
                     {activeTab === 'participation' && <DailyParticipationTab teamScope={false} />}
+                    {activeTab === 'global-wfh' && <GlobalWFHTab />}
                 </div>
             </div>
         </div>
