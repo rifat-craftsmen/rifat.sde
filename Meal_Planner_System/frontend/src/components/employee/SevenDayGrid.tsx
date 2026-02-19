@@ -104,6 +104,7 @@ const SevenDayGrid: React.FC = () => {
             iftar: mealType === 'iftar' ? toggleValue(currentIftar) : currentIftar,
             eventDinner: mealType === 'eventDinner' ? toggleValue(currentEventDinner) : currentEventDinner,
             optionalDinner: mealType === 'optionalDinner' ? toggleValue(currentOptionalDinner) : currentOptionalDinner,
+            workFromHome: false,
         });
     };
 
@@ -120,6 +121,7 @@ const SevenDayGrid: React.FC = () => {
             iftar: false,
             eventDinner: false,
             optionalDinner: false,
+            workFromHome: false,
         });
     };
 
@@ -128,15 +130,17 @@ const SevenDayGrid: React.FC = () => {
         if (!dayData || dayData.isPast) return;
 
         const dateString = extractDateString(date);
+        const isCurrentlyWFH = dayData.record?.workFromHome ?? false;
 
+        // Toggle: if already WFH, un-set it (keep meals as-is); if not WFH, set it and turn off all meals
         updateMealMutation.mutate({
             date: dateString,
-            lunch: false,
-            snacks: false,
-            iftar: false,
-            eventDinner: false,
-            optionalDinner: false,
-            workFromHome: true,
+            lunch: isCurrentlyWFH ? (dayData.record?.lunch ?? true) : false,
+            snacks: isCurrentlyWFH ? (dayData.record?.snacks ?? true) : false,
+            iftar: isCurrentlyWFH ? (dayData.record?.iftar ?? null) : false,
+            eventDinner: isCurrentlyWFH ? (dayData.record?.eventDinner ?? null) : false,
+            optionalDinner: isCurrentlyWFH ? (dayData.record?.optionalDinner ?? null) : false,
+            workFromHome: !isCurrentlyWFH,
         });
     };
 
@@ -158,15 +162,15 @@ const SevenDayGrid: React.FC = () => {
 
             <div className="space-y-3">
                 {schedule?.map((day) => {
-                    // Default to true for lunch/snacks when no record exists (matching backend defaults)
-                    const lunch = day.record?.lunch ?? true;
-                    const snacks = day.record?.snacks ?? true;
-                    const iftar = day.record?.iftar ?? null;
-                    const eventDinner = day.record?.eventDinner ?? null;
-                    const optionalDinner = day.record?.optionalDinner ?? null;
-
                     const mealSchedule = day.schedule;
                     const isDisabled = day.isPast;
+
+                    // Default to true for any meal that is enabled in the schedule but has no record yet
+                    const lunch = mealSchedule?.lunchEnabled !== false ? (day.record?.lunch ?? true) : null;
+                    const snacks = mealSchedule?.snacksEnabled !== false ? (day.record?.snacks ?? true) : null;
+                    const iftar = mealSchedule?.iftarEnabled ? (day.record?.iftar ?? true) : null;
+                    const eventDinner = mealSchedule?.eventDinnerEnabled ? (day.record?.eventDinner ?? true) : null;
+                    const optionalDinner = mealSchedule?.optionalDinnerEnabled ? (day.record?.optionalDinner ?? true) : null;
 
                     return (
                         <div
@@ -177,7 +181,7 @@ const SevenDayGrid: React.FC = () => {
                                 }`}
                         >
                             <div className="flex items-center justify-between mb-3">
-                                <div>
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <h3 className="font-semibold text-slate-800 dark:text-white">
                                         {formatDisplayDate(new Date(day.date))}
                                     </h3>
@@ -188,13 +192,13 @@ const SevenDayGrid: React.FC = () => {
                                         <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Past</span>
                                     )}
                                     {mealSchedule?.occasionName && (
-                                        <span className="inline-block mt-1 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full">
+                                        <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full">
                                             {mealSchedule.occasionName}
                                         </span>
                                     )}
                                     {day.record?.workFromHome && (
-                                        <span className="inline-block mt-1 ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">
-                                            Work From Home
+                                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">
+                                            🏠 WFH
                                         </span>
                                     )}
                                 </div>
@@ -210,10 +214,14 @@ const SevenDayGrid: React.FC = () => {
                                         </button>
                                         <button
                                             onClick={() => handleWFH(day.date)}
-                                            className="px-4 py-2 font-medium text-sm bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 active:scale-95"
+                                            className={`px-4 py-2 font-medium text-sm rounded-lg transition-colors duration-200 active:scale-95 ${
+                                                day.record?.workFromHome
+                                                    ? 'bg-blue-600 ring-2 ring-blue-300 dark:ring-blue-500 text-white'
+                                                    : 'bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white'
+                                            }`}
                                             disabled={updateMealMutation.isPending}
                                         >
-                                            WFH
+                                            🏠 WFH
                                         </button>
                                     </div>
                                 )}

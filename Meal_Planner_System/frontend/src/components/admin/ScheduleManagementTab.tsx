@@ -9,10 +9,16 @@ interface CreateScheduleModalProps {
     onClose: () => void;
 }
 
+const getTomorrowDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return formatDateForAPI(tomorrow);
+};
+
 const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({ isOpen, onClose }) => {
     const queryClient = useQueryClient();
     const [formData, setFormData] = useState<CreateScheduleData>({
-        date: formatDateForAPI(new Date()),
+        date: getTomorrowDate(),
         lunchEnabled: true,
         snacksEnabled: true,
         iftarEnabled: false,
@@ -39,7 +45,7 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({ isOpen, onClo
 
     const handleClose = () => {
         setFormData({
-            date: formatDateForAPI(new Date()),
+            date: getTomorrowDate(),
             lunchEnabled: true,
             snacksEnabled: true,
             iftarEnabled: false,
@@ -72,6 +78,7 @@ const CreateScheduleModal: React.FC<CreateScheduleModalProps> = ({ isOpen, onClo
                         <input
                             type="date"
                             value={formData.date}
+                            min={getTomorrowDate()}
                             onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                             required
                             className="input-field"

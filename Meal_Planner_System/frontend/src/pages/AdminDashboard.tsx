@@ -5,8 +5,9 @@ import ScheduleManagementTab from '../components/admin/ScheduleManagementTab';
 import EmployeeProxyTab from '../components/admin/EmployeeProxyTab';
 import HeadcountReportsTab from '../components/admin/HeadcountReportsTab';
 import DailyParticipationTab from '../components/shared/DailyParticipationTab';
+import SevenDayGrid from '../components/employee/SevenDayGrid';
 
-type TabType = 'users' | 'schedules' | 'proxy' | 'headcount' | 'participation';
+type TabType = 'my-meals' | 'users' | 'schedules' | 'proxy' | 'headcount' | 'participation';
 
 const AdminDashboard: React.FC = () => {
     const { user, logout } = useAuth();
@@ -21,6 +22,7 @@ const AdminDashboard: React.FC = () => {
     };
 
     const tabs = [
+        { id: 'my-meals' as TabType, label: 'My Meals', icon: '🍱' },
         { id: 'users' as TabType, label: 'User Management', icon: '👥' },
         { id: 'schedules' as TabType, label: 'Schedule Management', icon: '📅' },
         { id: 'proxy' as TabType, label: 'Employee Proxy', icon: '✏️' },
@@ -70,6 +72,7 @@ const AdminDashboard: React.FC = () => {
 
                 {/* Tab Content */}
                 <div className="card animate-fade-in">
+                    {activeTab === 'my-meals' && <SevenDayGrid />}
                     {activeTab === 'users' && <UserManagementTab />}
                     {activeTab === 'schedules' && <ScheduleManagementTab />}
                     {activeTab === 'proxy' && <EmployeeProxyTab />}

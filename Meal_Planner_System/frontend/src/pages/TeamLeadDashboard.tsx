@@ -5,6 +5,7 @@ import api from '../services/api';
 import type { User } from '../types';
 import ProxySevenDayGrid from '../components/shared/ProxySevenDayGrid';
 import DailyParticipationTab from '../components/shared/DailyParticipationTab';
+import SevenDayGrid from '../components/employee/SevenDayGrid';
 
 interface EmployeeEditModalProps {
     employee: User;
@@ -44,11 +45,11 @@ const EmployeeEditModal: React.FC<EmployeeEditModalProps> = ({ employee, isOpen,
     );
 };
 
-type TabType = 'search-edit' | 'participation';
+type TabType = 'my-meals' | 'search-edit' | 'participation';
 
 const TeamLeadDashboard: React.FC = () => {
     const { user, logout } = useAuth();
-    const [activeTab, setActiveTab] = useState<TabType>('search-edit');
+    const [activeTab, setActiveTab] = useState<TabType>('my-meals');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
 
@@ -96,31 +97,30 @@ const TeamLeadDashboard: React.FC = () => {
 
                 {/* Tabs */}
                 <div className="card mb-6">
-                    <div className="flex space-x-2">
-                        <button
-                            onClick={() => setActiveTab('search-edit')}
-                            className={`px-4 py-3 rounded-lg font-medium transition-all ${activeTab === 'search-edit'
-                                    ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg'
-                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                                }`}
-                        >
-                            <span className="mr-2">✏️</span>
-                            Search & Edit
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('participation')}
-                            className={`px-4 py-3 rounded-lg font-medium transition-all ${activeTab === 'participation'
-                                    ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg'
-                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                                }`}
-                        >
-                            <span className="mr-2">📋</span>
-                            Daily Participation
-                        </button>
+                    <div className="flex space-x-2 overflow-x-auto">
+                        {([
+                            { id: 'my-meals', label: 'My Meals', icon: '🍱' },
+                            { id: 'search-edit', label: 'Search & Edit', icon: '✏️' },
+                            { id: 'participation', label: 'Daily Participation', icon: '📋' },
+                        ] as { id: TabType; label: string; icon: string }[]).map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-4 py-3 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === tab.id
+                                        ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg'
+                                        : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                                    }`}
+                            >
+                                <span className="mr-2">{tab.icon}</span>
+                                {tab.label}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
                 {/* Tab Content */}
+                {activeTab === 'my-meals' && <SevenDayGrid />}
+
                 {activeTab === 'search-edit' && (
                     <>
                         {/* Search Bar */}
