@@ -1,6 +1,6 @@
 ## Meal Headcount Planner Technical Design Document
 - Author: Rifat Ahmed
-- Iteration: 2
+- Iteration: 3
 - Version: v1
 - Status: In Review
 
@@ -36,6 +36,14 @@ The **Meal Headcount Planner (MHP)** is an internal web application designed to 
 6. Daily announcement message generation
 7. Special day type presets (Office Closed, Government Holiday, etc.)
 8. Live HeadCount dashboard updates
+
+
+**Key New Features added at Iteration 3:**
+1. Auditability columns in Daily Participation view (last modified by, modified at)
+2. Special occasion badge on Headcount tab when a schedule occasion exists for selected date
+3. WFH over-limit indicators in Daily Participation view (per-employee WFH count column, red highlight if > 5, summary cards)
+4. WFH over-limit filter in Daily Participation view
+
 
 ---
 
@@ -206,6 +214,34 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 **FR15: Live Dashboard Updates**
 - FR15.1: Headcount reports must auto-refresh without relaoding when any meal status changes by any user
+
+
+**FR16: Auditability in Daily Participation View**
+- FR16.1: The Daily Participation table (visible to Team Lead and Admin) must display a "Last Modified By" column showing the `name` of the user who last updated each meal record (null/system if cron-generated or self-edited)
+- FR16.2: The Daily Participation table must display a "Modified At" column showing the `updatedAt` timestamp of each meal record
+- FR16.3: Backend must resolve `lastModifiedBy` user ID to the corresponding user's name before returning it in the daily participation response
+- FR16.4: These audit fields must reflect the most recent change — whether made by the employee, a Team Lead, or an Admin
+
+**FR17: Special Occasion Badge on Headcount View**
+- FR17.1: When a `MealSchedule` record exists for the selected date and has an `occasionName` set, the Headcount tab must display a visible badge or banner showing that occasion name
+- FR17.2: The occasion badge must appear prominently near the date picker / top of the headcount card area
+- FR17.3: Backend `GET /api/admin/headcount` must include `occasionName` in its response (null if no schedule or no name set)
+
+**FR18: WFH Over-Limit Indicators in Daily Participation**
+- FR18.1: The Daily Participation table must include a "WFH Taken" column showing each employee's WFH day count for the current month
+- FR18.2: If an employee's monthly WFH count exceeds 5 days, the value in the "WFH Taken" column must be displayed in red to indicate over-limit status
+- FR18.3: Above the Daily Participation table, two summary cards must be displayed:
+  - **"WFH Limit Exceeded"**: count of employees whose monthly WFH > 5
+  - **"Total Extra WFH Days"**: sum of (wfhCount - 5) for all employees who are over the limit
+- FR18.4: The 5-day monthly WFH allowance is a soft limit — records beyond the limit are still accepted; this is for visibility only
+- FR18.5: Backend `GET /api/admin/daily-participation` must return `wfhCount` (monthly WFH days) per employee in its response
+
+**FR19: WFH Over-Limit Filter in Daily Participation**
+- FR19.1: A filter button ("Show Over-Limit Only") must appear above the Daily Participation table
+- FR19.2: When the filter is active, only employees whose monthly WFH count exceeds 5 are shown in the table
+- FR19.3: The filter can be toggled on/off without a new API call (client-side filtering of already-loaded data)
+- FR19.4: The filter button must have a visible active/inactive state indicator
+
 
 
 ### 4.2 Non-Functional Requirements
@@ -577,6 +613,39 @@ The organization currently uses an Excel-based system to track daily meal headco
 7. Maria clicks "Copy" button
 8. System copies message to clipboard
 
+---
+
+
+### 6.10 Admin/Lead Viewing Audit Trail and WFH Over-Limit Report
+
+**Actor:** Admin (Alice) or Team Lead (Sarah)
+**Goal:** Identify who changed a participation entry and flag employees over WFH limit
+
+**Steps:**
+1. Alice logs into Admin dashboard and navigates to "Daily Participation" tab
+2. Selects today's date
+3. System fetches participation data including:
+   - Per-employee WFH count for the current month
+   - Last modifier name and timestamp for each meal record
+4. Table displays all employees with columns:
+   - Name, Team, Location, Meal checkboxes, **WFH Taken**, **Last Modified By**, **Modified At**
+5. Alice notices John's "WFH Taken" value is **7** — shown in red (over 5-day limit)
+6. Alice sees "Last Modified By: Sarah (Team Lead)" and "Modified At: Feb 19, 10:32 AM" on John's row — confirming Sarah made the most recent change
+7. Above the table, two summary cards show:
+   - **WFH Limit Exceeded**: 3 employees
+   - **Total Extra WFH Days**: 5 days
+8. Alice clicks "Show Over-Limit Only" filter button
+9. Table immediately narrows to show only the 3 employees exceeding the WFH allowance
+10. Alice clicks "Show Over-Limit Only" again to clear the filter and see all employees
+
+**Occasion Badge Flow:**
+1. Alice switches to "Headcount Reports" tab
+2. Selects March 15 (a date with a special occasion schedule)
+3. System shows the standard headcount cards
+4. A purple badge reads: **🎉 Company Annual Celebration** — displayed above the headcount cards
+5. Alice confirms the occasion is active before generating the daily announcement
+
+
 
 ---
 
@@ -739,7 +808,10 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 **MealRecord Table:**
 - Stores individual employee meal participation
-- Fields: id, userId (FK), date, meal participation flags (boolean), lastModifiedBy, notificationSent
+- Fields: id, userId (FK), date, meal participation flags (boolean), workFromHome, lastModifiedBy, updatedAt, notificationSent
+- `lastModifiedBy`: tracks who last changed the record — null means cron-generated or self-edited; a non-null value is the userId of the Team Lead or Admin who made the change
+- `updatedAt`: Prisma auto-managed timestamp — updated on every write. Now surfaced in the Daily Participation view to provide a full audit trail
+- Both `lastModifiedBy` and `updatedAt` were present in the schema since Iteration 1; they are **newly exposed** in the daily participation API response in Iteration 3
 - Unique constraint: (userId, date) prevents duplicates
 - lastModifiedBy tracks proxy edits (null = self-edit, otherwise Team Lead/Admin ID)
 - notificationSent prepared for future notification feature (false = notification pending)
@@ -782,6 +854,8 @@ The organization currently uses an Excel-based system to track daily meal headco
 | GET | `/api/admin/global-wfh` | ADMIN | Get all global WFH periods |
 | DELETE | `/api/admin/global-wfh/:id` | ADMIN | Delete global WFH period |
 | POST | `/api/admin/generate-announcement` | ADMIN, LOGISTICS | Generate daily announcement message |
+| GET | `/api/admin/daily-participation?date=YYYY-MM-DD` | LEAD, ADMIN | Get daily participation (team-filtered for LEAD). **[Iter 3]** Now also returns per-employee `wfhCount` (monthly WFH days), `lastModifiedByName` (resolved user name or null), and `updatedAt` |
+| GET | `/api/admin/headcount?date=YYYY-MM-DD` | ADMIN, LOGISTICS | Get daily headcount. **[Iter 3]** Now also returns `occasionName` (from MealSchedule for that date, or null) |
 
 
 **Sample Request/Response:**
@@ -816,6 +890,8 @@ The organization currently uses an Excel-based system to track daily meal headco
 }
 ```
 
+
+
 ### 7.4 Frontend Component Hierarchy
 
 ```
@@ -846,6 +922,10 @@ App
 │       │       │   └── DailyParticipationTab (teamScope=true)
 │       │       │       ├── DatePicker
 │       │       │       ├── StatusMessage (read-only/editable)
+│       │       │       ├── WFHSummaryCards 
+│       │       │       │   ├── WFHLimitExceededCard
+│       │       │       │   └── TotalExtraWFHDaysCard
+│       │       │       ├── OverLimitFilterButton 
 │       │       │       ├── BulkActionsToolbar (if editable)
 │       │       │       │   ├── WFH for All Button
 │       │       │       │   ├── All Off Button
@@ -855,9 +935,11 @@ App
 │       │       │           └── EmployeeRow
 │       │       │               ├── SelectCheckbox
 │       │       │               ├── Name
-│       │       │               ├── Team
 │       │       │               ├── LocationBadge (Office/WFH)
-│       │       │               └── MealColumns (5 meal types)
+│       │       │               ├── MealColumns (5 meal types)
+│       │       │               ├── WFHTakenColumn  (red if > 5)
+│       │       │               ├── LastModifiedByColumn 
+│       │       │               └── ModifiedAtColumn 
 │       │       │
 │       │       └── Search & Edit Tab
 │       │           └── EmployeeProxyTab
@@ -869,6 +951,9 @@ App
 │       │
 │       ├── AdminDashboard  
 │       │   └── Tabs
+│       │       ├── My Meals Tab
+│       │       │   └── SevenDayGrid
+│       │       │
 │       │       ├── UserManagementTab
 │       │       │   ├── CreateUserButton → CreateUserModal
 │       │       │   │   └── UserForm
@@ -883,7 +968,7 @@ App
 │       │       │   ├── CreateScheduleButton → CreateScheduleModal
 │       │       │   │   └── ScheduleForm
 │       │       │   │       ├── DatePicker
-│       │       │   │       ├── SpecialDayTypeDropdown (NEW)
+│       │       │   │       ├── SpecialDayTypeDropdown
 │       │       │   │       │   ├── Office Closed
 │       │       │   │       │   ├── Government Holiday
 │       │       │   │       │   ├── Special Celebration
@@ -901,10 +986,39 @@ App
 │       │       │   └── EmployeeEditModal
 │       │       │       └── SevenDayGrid
 │       │       │
+│       │       ├── HeadcountReportsTab
+│       │       │   ├── DatePicker
+│       │       │   ├── GlobalWFHBanner (if active)
+│       │       │   ├── OccasionBadge  (if occasionName exists for date)
+│       │       │   ├── TotalEmployeesCard
+│       │       │   ├── MealHeadcountCards (5 meal types)
+│       │       │   ├── TeamBreakdownCards  
+│       │       │   │   └── TeamCard
+│       │       │   │       ├── TeamName
+│       │       │   │       ├── TotalMeals
+│       │       │   │       └── MealTypeBreakdown
+│       │       │   │           ├── Lunch count
+│       │       │   │           ├── Snacks count
+│       │       │   │           ├── Iftar count
+│       │       │   │           ├── Event Dinner count
+│       │       │   │           └── Optional Dinner count
+│       │       │   ├── OfficeWFHSplitCards
+│       │       │   │   ├── OfficeCard
+│       │       │   │   └── WFHCard
+│       │       │   ├── OverallTotalCard
+│       │       │   └── GenerateAnnouncementButton
+│       │       │       └── AnnouncementModal
+│       │       │           ├── MessageTextArea
+│       │       │           └── CopyButton
+│       │       │
 │       │       ├── Daily Participation Tab  
 │       │       │   └── DailyParticipationTab (teamScope=false)
 │       │       │       ├── DatePicker
 │       │       │       ├── StatusMessage (read-only/editable)
+│       │       │       ├── WFHSummaryCards 
+│       │       │       │   ├── WFHLimitExceededCard
+│       │       │       │   └── TotalExtraWFHDaysCard
+│       │       │       ├── OverLimitFilterButton 
 │       │       │       ├── BulkActionsToolbar (if editable)
 │       │       │       │   ├── WFH for All Button
 │       │       │       │   ├── All Off Button
@@ -916,33 +1030,12 @@ App
 │       │       │               ├── Name
 │       │       │               ├── Team
 │       │       │               ├── LocationBadge (Office/WFH)
-│       │       │               └── MealColumns (5 meal types)
+│       │       │               ├── MealColumns (5 meal types)
+│       │       │               ├── WFHTakenColumn  (red if > 5)
+│       │       │               ├── LastModifiedByColumn 
+│       │       │               └── ModifiedAtColumn 
 │       │       │
-│       │       ├── HeadcountReportsTab 
-│       │       │   ├── DatePicker
-│       │       │   ├── GlobalWFHBanner (if active)
-│       │       │   ├── TotalEmployeesCard
-│       │       │   ├── MealHeadcountCards (5 meal types)
-│       │       │   ├── TeamBreakdownCards  
-│       │       │   │   └── TeamCard
-│       │       │   │       ├── TeamName
-│       │       │   │       ├── TotalMeals
-│       │       │   │       └── MealTypeBreakdown (NEW)
-│       │       │   │           ├── Lunch count
-│       │       │   │           ├── Snacks count
-│       │       │   │           ├── Iftar count
-│       │       │   │           ├── Event Dinner count
-│       │       │   │           └── Optional Dinner count
-│       │       │   ├── OfficeWFHSplitCards 
-│       │       │   │   ├── OfficeCard
-│       │       │   │   └── WFHCard
-│       │       │   ├── OverallTotalCard 
-│       │       │   └── GenerateAnnouncementButton 
-│       │       │       └── AnnouncementModal
-│       │       │           ├── MessageTextArea
-│       │       │           └── CopyButton
-│       │       │
-│       │       └── Global WFH Tab 
+│       │       └── Global WFH Tab
 │       │           └── GlobalWFHTab
 │       │               ├── CreateWFHPeriodForm
 │       │               │   ├── DateFromPicker
@@ -959,15 +1052,17 @@ App
 │       └── LogisticsDashboard  
 │           ├── DatePicker
 │           ├── GlobalWFHBanner (if active)
+│           ├── OccasionBadge  (if occasionName exists for date)
 │           ├── MealHeadcountCards
-│           ├── TeamBreakdownCards 
-│           ├── OfficeWFHSplitCards 
-│           ├── OverallTotalCard 
-│           └── GenerateAnnouncementButton 
+│           ├── TeamBreakdownCards
+│           ├── OfficeWFHSplitCards
+│           ├── OverallTotalCard
+│           └── GenerateAnnouncementButton
 │
 └── LoginPage
     └── LoginForm
 ```
+
 
 ---
 
@@ -1465,6 +1560,40 @@ describe('POST /api/meals/my-record', () => {
 - ☐ Headcount excludes inactive and deleted users.
 
 
+#### G. Iteration 3 — Auditability, WFH Indicators & Occasion Badge
+
+**Auditability Columns (FR16)**
+- ☐ Daily Participation table shows "Last Modified By" column for all rows
+- ☐ Rows edited by a Team Lead show that Lead's name (not null, not "system")
+- ☐ Rows edited by Admin show Admin's name
+- ☐ Rows created by cron job show null / "—" in "Last Modified By"
+- ☐ "Modified At" column shows correct timestamp for each row
+- ☐ After a proxy edit, "Last Modified By" and "Modified At" update correctly in the table
+
+**Occasion Badge on Headcount Tab (FR17)**
+- ☐ When no MealSchedule exists for selected date, no occasion badge is shown
+- ☐ When MealSchedule exists but occasionName is null, no badge is shown
+- ☐ When MealSchedule has occasionName set, badge displays correctly with the occasion name
+- ☐ Badge disappears if the MealSchedule is deleted for that date
+
+**WFH Over-Limit Indicators (FR18)**
+- ☐ "WFH Taken" column in Daily Participation table shows correct monthly WFH count per employee
+- ☐ Employees with WFH count ≤ 5 show count in normal text
+- ☐ Employees with WFH count > 5 show count highlighted in red
+- ☐ "WFH Limit Exceeded" summary card shows correct count of over-limit employees
+- ☐ "Total Extra WFH Days" summary card shows correct total of excess days
+- ☐ Summary cards update if date is changed (WFH count is per current month, not per selected date)
+
+**WFH Over-Limit Filter (FR19)**
+- ☐ "Show Over-Limit Only" filter button is visible above the table
+- ☐ Clicking the filter shows only employees with WFH count > 5
+- ☐ Clicking the filter again clears it and shows all employees
+- ☐ Filter button has a visible active state when engaged
+- ☐ Filter works correctly when combined with date changes
+- ☐ No additional API call is made when toggling the filter (client-side filtering)
+
+
+
 ## 11. Operations
 
 ### 11.1 Deployment Architecture
@@ -1686,4 +1815,3 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 - API uptime: Target ≥99% during business hours
 
 ---
-
