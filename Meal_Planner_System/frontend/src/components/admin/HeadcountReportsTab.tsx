@@ -61,6 +61,8 @@ const HeadcountReportsTab: React.FC = () => {
             const response = await api.get(`/admin/headcount?date=${selectedDate}`);
             return response.data;
         },
+        refetchInterval: 30000,          // re-fetch every 30 seconds
+        refetchIntervalInBackground: false, // pause polling when tab is not active
     });
 
     const mealCards = [
