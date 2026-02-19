@@ -27,7 +27,18 @@ export const mealUpdateValidation = [
 ];
 
 export const scheduleValidation = [
-  body('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('Valid date in YYYY-MM-DD format required'),
+  body('date')
+    .matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('Valid date in YYYY-MM-DD format required')
+    .custom((value) => {
+      const inputDate = new Date(value + 'T00:00:00');
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      if (inputDate < tomorrow) {
+        throw new Error('Schedule date must be at least tomorrow');
+      }
+      return true;
+    }),
   body('lunchEnabled').isBoolean(),
   body('snacksEnabled').isBoolean(),
   body('iftarEnabled').isBoolean(),
