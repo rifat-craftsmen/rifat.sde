@@ -9,6 +9,7 @@ import {
     deleteMealSchedule,
     getDailyHeadcount,
     getDailyParticipation,
+    bulkUpdateMeals,
 } from '../services/adminService';
 import { getMySchedule, addOrUpdateMealRecord } from '../services/mealService';
 
@@ -131,5 +132,21 @@ export const getDailyParticipationData = async (req: AuthRequest, res: Response)
         return res.json(participation);
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
+    }
+};
+
+export const bulkUpdateMealsController = async (req: AuthRequest, res: Response) => {
+    try {
+        const modifiedBy = req.user!.userId;
+        const userRole = req.user!.role;
+        const userTeamId = req.user!.teamId;
+
+        // Team leads can only update employees in their own team
+        const teamScope = userRole === 'LEAD' ? userTeamId : undefined;
+
+        const result = await bulkUpdateMeals(req.body, modifiedBy, teamScope);
+        return res.json({ success: true, ...result });
+    } catch (error: any) {
+        return res.status(400).json({ error: error.message });
     }
 };

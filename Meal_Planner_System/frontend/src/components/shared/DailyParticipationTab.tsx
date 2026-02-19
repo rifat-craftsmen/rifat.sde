@@ -1,31 +1,41 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { formatDateForAPI } from '../../utils/dateHelpers';
 
-interface DailyParticipationData {
-    date: string;
-    employees: Array<{
-        id: number;
-        name: string;
-        teamName: string | null;
-        workFromHome: boolean;
-        meals: {
-            lunch: boolean | null;
-            snacks: boolean | null;
-            iftar: boolean | null;
-            eventDinner: boolean | null;
-            optionalDinner: boolean | null;
-        };
-    }>;
+interface Employee {
+    id: number;
+    name: string;
+    teamName: string | null;
+    workFromHome: boolean;
+    meals: {
+        lunch: boolean | null;
+        snacks: boolean | null;
+        iftar: boolean | null;
+        eventDinner: boolean | null;
+        optionalDinner: boolean | null;
+    };
 }
 
+interface DailyParticipationData {
+    date: string;
+    employees: Employee[];
+}
+
+type BulkAction = 'WFH_ALL' | 'ALL_OFF' | 'SET_ALL_MEALS' | 'UNSET_ALL_MEALS';
+
 interface Props {
-    teamScope?: boolean; // If true, only show team members (for Team Lead)
+    teamScope?: boolean;
 }
 
 const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
+    const queryClient = useQueryClient();
     const [selectedDate, setSelectedDate] = useState(formatDateForAPI(new Date()));
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+    // A date is "future" (editable) if it's strictly after today
+    const today = formatDateForAPI(new Date());
+    const isFutureDate = selectedDate > today;
 
     const { data, isLoading } = useQuery<DailyParticipationData>({
         queryKey: ['daily-participation', selectedDate, teamScope],
@@ -35,14 +45,54 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
         },
     });
 
-    const renderCheckIcon = (value: boolean | null) => {
-        if (value === true) {
-            return <span className="text-green-600 dark:text-green-400 text-lg">✅</span>;
-        } else if (value === false) {
-            return <span className="text-red-600 dark:text-red-400 text-lg">❌</span>;
+    const bulkMutation = useMutation({
+        mutationFn: async ({ action, userIds }: { action: BulkAction; userIds: number[] }) => {
+            await api.post('/admin/meals/bulk-update', {
+                userIds,
+                date: selectedDate,
+                action,
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['daily-participation', selectedDate, teamScope] });
+            setSelectedIds(new Set());
+        },
+    });
+
+    const employees = data?.employees ?? [];
+
+    const allSelected = employees.length > 0 && selectedIds.size === employees.length;
+    const someSelected = selectedIds.size > 0 && !allSelected;
+
+    const toggleAll = () => {
+        if (allSelected) {
+            setSelectedIds(new Set());
         } else {
-            return <span className="text-slate-400 dark:text-slate-600 text-lg">➖</span>;
+            setSelectedIds(new Set(employees.map((e) => e.id)));
         }
+    };
+
+    const toggleOne = (id: number) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    const handleBulkAction = (action: BulkAction) => {
+        if (selectedIds.size === 0) return;
+        bulkMutation.mutate({ action, userIds: Array.from(selectedIds) });
+    };
+
+    const renderCheckIcon = (value: boolean | null) => {
+        if (value === true) return <span className="text-green-600 dark:text-green-400 text-lg">✅</span>;
+        if (value === false) return <span className="text-red-600 dark:text-red-400 text-lg">❌</span>;
+        return <span className="text-slate-400 dark:text-slate-600 text-lg">➖</span>;
     };
 
     if (isLoading) {
@@ -57,7 +107,7 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
     return (
         <div>
             {/* Date Picker */}
-            <div className="card mb-6">
+            <div className="card mb-4">
                 <label htmlFor="participation-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Select Date
                 </label>
@@ -65,22 +115,91 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
                     id="participation-date"
                     type="date"
                     value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
+                    onChange={(e) => {
+                        setSelectedDate(e.target.value);
+                        setSelectedIds(new Set());
+                    }}
                     className="input-field max-w-xs"
                 />
+                {!isFutureDate && (
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                        Bulk actions are only available for future dates.
+                    </p>
+                )}
             </div>
 
-            {/* Employee Participation Table */}
+            {/* Bulk Action Bar — only for future dates when rows are selected */}
+            {isFutureDate && selectedIds.size > 0 && (
+                <div className="card mb-4 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+                            {selectedIds.size} selected
+                        </span>
+                        <div className="flex gap-2 flex-wrap">
+                            <button
+                                onClick={() => handleBulkAction('WFH_ALL')}
+                                disabled={bulkMutation.isPending}
+                                className="px-3 py-1.5 text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                🏠 WFH
+                            </button>
+                            <button
+                                onClick={() => handleBulkAction('ALL_OFF')}
+                                disabled={bulkMutation.isPending}
+                                className="px-3 py-1.5 text-sm font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                All Off
+                            </button>
+                            <button
+                                onClick={() => handleBulkAction('SET_ALL_MEALS')}
+                                disabled={bulkMutation.isPending}
+                                className="px-3 py-1.5 text-sm font-medium bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                All Meals ON
+                            </button>
+                            <button
+                                onClick={() => handleBulkAction('UNSET_ALL_MEALS')}
+                                disabled={bulkMutation.isPending}
+                                className="px-3 py-1.5 text-sm font-medium bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                All Meals OFF
+                            </button>
+                        </div>
+                        {bulkMutation.isPending && (
+                            <span className="text-sm text-primary-600 dark:text-primary-400">Updating...</span>
+                        )}
+                        {bulkMutation.isError && (
+                            <span className="text-sm text-red-600 dark:text-red-400">
+                                {(bulkMutation.error as any)?.response?.data?.error || 'Update failed'}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Table */}
             <div className="card">
                 <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">
-                    {teamScope ? 'Team Participation' : 'Daily Participation'} ({data?.employees.length || 0} people)
+                    {teamScope ? 'Team Participation' : 'Daily Participation'} ({employees.length} people)
                 </h3>
 
-                {data && data.employees.length > 0 ? (
+                {employees.length > 0 ? (
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                             <thead className="bg-slate-50 dark:bg-slate-800">
                                 <tr>
+                                    {/* Select all checkbox — only for future dates */}
+                                    {isFutureDate && (
+                                        <th className="px-3 py-3 text-left">
+                                            <input
+                                                type="checkbox"
+                                                checked={allSelected}
+                                                ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                                                onChange={toggleAll}
+                                                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500 cursor-pointer"
+                                            />
+                                        </th>
+                                    )}
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                         Name
                                     </th>
@@ -110,44 +229,55 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
-                                {data.employees.map((employee) => (
-                                    <tr key={employee.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">
-                                            {employee.name}
-                                        </td>
-                                        {!teamScope && (
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
-                                                {employee.teamName || '-'}
-                                            </td>
-                                        )}
-                                        <td className="px-4 py-3 whitespace-nowrap text-sm">
-                                            {employee.workFromHome ? (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
-                                                    🏠 WFH
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                                                    🏢 Office
-                                                </span>
+                                {employees.map((employee) => {
+                                    const isSelected = selectedIds.has(employee.id);
+                                    return (
+                                        <tr
+                                            key={employee.id}
+                                            className={`transition-colors ${
+                                                isSelected
+                                                    ? 'bg-primary-50 dark:bg-primary-900/20'
+                                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                                            }`}
+                                        >
+                                            {/* Row checkbox — only for future dates */}
+                                            {isFutureDate && (
+                                                <td className="px-3 py-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => toggleOne(employee.id)}
+                                                        className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500 cursor-pointer"
+                                                    />
+                                                </td>
                                             )}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {renderCheckIcon(employee.meals.lunch)}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {renderCheckIcon(employee.meals.snacks)}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {renderCheckIcon(employee.meals.iftar)}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {renderCheckIcon(employee.meals.eventDinner)}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {renderCheckIcon(employee.meals.optionalDinner)}
-                                        </td>
-                                    </tr>
-                                ))}
+                                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">
+                                                {employee.name}
+                                            </td>
+                                            {!teamScope && (
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
+                                                    {employee.teamName || '-'}
+                                                </td>
+                                            )}
+                                            <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                                {employee.workFromHome ? (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                                                        🏠 WFH
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                                                        🏢 Office
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.lunch)}</td>
+                                            <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.snacks)}</td>
+                                            <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.iftar)}</td>
+                                            <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.eventDinner)}</td>
+                                            <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.optionalDinner)}</td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
