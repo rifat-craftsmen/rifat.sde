@@ -117,17 +117,151 @@ export const deleteMealSchedule = async (scheduleId: number) => {
 export const getDailyHeadcount = async (date: Date) => {
   const targetDate = formatDateForDB(date);
 
+  // Get all records with user and team data
   const records = await prisma.mealRecord.findMany({
     where: { date: targetDate },
+    include: {
+      user: {
+        select: {
+          teamId: true,
+          team: {
+            select: { name: true }
+          }
+        }
+      }
+    }
   });
+
+  // Check if date falls within global WFH period
+  const globalWFH = await prisma.globalWFHPeriod.findFirst({
+    where: {
+      dateFrom: { lte: targetDate },
+      dateTo: { gte: targetDate }
+    }
+  });
+
+  // Meal totals
+  const mealTotals = {
+    lunch: records.filter(r => r.lunch).length,
+    snacks: records.filter(r => r.snacks).length,
+    iftar: records.filter(r => r.iftar).length,
+    eventDinner: records.filter(r => r.eventDinner).length,
+    optionalDinner: records.filter(r => r.optionalDinner).length,
+  };
+
+  // Team breakdown with meal type counts
+  const teamMap = new Map<number, {
+    teamName: string,
+    totalMeals: number,
+    lunch: number,
+    snacks: number,
+    iftar: number,
+    eventDinner: number,
+    optionalDinner: number
+  }>();
+
+  records.forEach(record => {
+    const teamId = record.user.teamId;
+    if (!teamId) return;
+
+    const mealCount = [
+      record.lunch, record.snacks, record.iftar,
+      record.eventDinner, record.optionalDinner
+    ].filter(Boolean).length;
+
+    if (teamMap.has(teamId)) {
+      const team = teamMap.get(teamId)!;
+      team.totalMeals += mealCount;
+      team.lunch += record.lunch ? 1 : 0;
+      team.snacks += record.snacks ? 1 : 0;
+      team.iftar += record.iftar ? 1 : 0;
+      team.eventDinner += record.eventDinner ? 1 : 0;
+      team.optionalDinner += record.optionalDinner ? 1 : 0;
+    } else {
+      teamMap.set(teamId, {
+        teamName: record.user.team?.name || 'Unknown',
+        totalMeals: mealCount,
+        lunch: record.lunch ? 1 : 0,
+        snacks: record.snacks ? 1 : 0,
+        iftar: record.iftar ? 1 : 0,
+        eventDinner: record.eventDinner ? 1 : 0,
+        optionalDinner: record.optionalDinner ? 1 : 0
+      });
+    }
+  });
+
+  const teamBreakdown = Array.from(teamMap.entries()).map(([teamId, data]) => ({
+    teamId,
+    teamName: data.teamName,
+    totalMeals: data.totalMeals,
+    lunch: data.lunch,
+    snacks: data.snacks,
+    iftar: data.iftar,
+    eventDinner: data.eventDinner,
+    optionalDinner: data.optionalDinner
+  }));
+
+  // Work location split
+  const officeCount = records.filter(r => !r.workFromHome).length;
+  const wfhCount = records.filter(r => r.workFromHome).length;
+
+  // Overall total (sum of all meals)
+  const overallTotal = Object.values(mealTotals).reduce((sum, count) => sum + count, 0);
 
   return {
     date: targetDate,
-    lunch: records.filter((r) => r.lunch).length,
-    snacks: records.filter((r) => r.snacks).length,
-    iftar: records.filter((r) => r.iftar).length,
-    eventDinner: records.filter((r) => r.eventDinner).length,
-    optionalDinner: records.filter((r) => r.optionalDinner).length,
-    totalEmployees: records.length,
+    mealTotals,
+    teamBreakdown,
+    workLocationSplit: { office: officeCount, wfh: wfhCount },
+    overallTotal,
+    globalWFHActive: !!globalWFH,
+    globalWFHNote: globalWFH?.note || null
+  };
+};
+
+// Get daily participation (employee-level meal data)
+// Fetches ALL active employees and their meal records for the date (LEFT JOIN)
+export const getDailyParticipation = async (date: Date, teamId?: number) => {
+  const targetDate = formatDateForDB(date);
+
+  // Fetch all active users (with optional team filter)
+  const users = await prisma.user.findMany({
+    where: {
+      status: 'ACTIVE',
+      ...(teamId && { teamId: teamId })
+    },
+    select: {
+      id: true,
+      name: true,
+      team: {
+        select: { name: true }
+      },
+      records: {
+        where: { date: targetDate },
+        take: 1
+      }
+    },
+    orderBy: { name: 'asc' }
+  });
+
+  return {
+    date: targetDate.toISOString(),
+    employees: users.map(user => {
+      const record = user.records[0]; // Will be undefined if no record exists
+
+      return {
+        id: user.id,
+        name: user.name,
+        teamName: user.team?.name || null,
+        workFromHome: record?.workFromHome ?? false,
+        meals: {
+          lunch: record?.lunch ?? null,
+          snacks: record?.snacks ?? null,
+          iftar: record?.iftar ?? null,
+          eventDinner: record?.eventDinner ?? null,
+          optionalDinner: record?.optionalDinner ?? null
+        }
+      };
+    })
   };
 };

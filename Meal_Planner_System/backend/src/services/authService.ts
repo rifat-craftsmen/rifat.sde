@@ -14,6 +14,12 @@ export const loginUser = async (email: string, password: string) => {
       role: true,
       status: true,
       teamId: true,
+      team: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   });
 
@@ -47,6 +53,7 @@ export const loginUser = async (email: string, password: string) => {
       email: user.email,
       role: user.role,
       teamId: user.teamId,
+      team: user.team,
     },
   };
 };

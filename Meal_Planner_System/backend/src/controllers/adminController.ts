@@ -8,6 +8,7 @@ import {
     getAllMealSchedules,
     deleteMealSchedule,
     getDailyHeadcount,
+    getDailyParticipation,
 } from '../services/adminService';
 import { getMySchedule, addOrUpdateMealRecord } from '../services/mealService';
 
@@ -112,6 +113,22 @@ export const getHeadcount = async (req: AuthRequest, res: Response) => {
         const date = req.query.date ? new Date(req.query.date as string) : new Date();
         const headcount = await getDailyHeadcount(date);
         return res.json(headcount);
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const getDailyParticipationData = async (req: AuthRequest, res: Response) => {
+    try {
+        const date = req.query.date ? new Date(req.query.date as string) : new Date();
+        const userRole = req.user!.role;
+        const userTeamId = req.user!.teamId;
+
+        // Team leads can only see their own team
+        const teamId = userRole === 'LEAD' ? userTeamId : undefined;
+
+        const participation = await getDailyParticipation(date, teamId);
+        return res.json(participation);
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
     }

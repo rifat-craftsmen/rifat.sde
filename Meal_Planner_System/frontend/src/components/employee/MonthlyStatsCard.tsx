@@ -15,45 +15,71 @@ const MonthlyStatsCard: React.FC = () => {
         },
     });
 
+    const mealTypeCards = [
+        { label: 'Lunch', count: stats?.breakdown.lunch || 0, color: 'from-blue-500 to-blue-600', icon: '🍱' },
+        { label: 'Snacks', count: stats?.breakdown.snacks || 0, color: 'from-green-500 to-green-600', icon: '🍪' },
+        { label: 'Iftar', count: stats?.breakdown.iftar || 0, color: 'from-purple-500 to-purple-600', icon: '🌙' },
+        { label: 'Event Dinner', count: stats?.breakdown.eventDinner || 0, color: 'from-pink-500 to-pink-600', icon: '🎉' },
+        { label: 'Optional Dinner', count: stats?.breakdown.optionalDinner || 0, color: 'from-orange-500 to-orange-600', icon: '🍽️' },
+    ];
+
     if (isLoading) {
         return (
-            <div className="card animate-pulse">
-                < div className="h-24 bg-slate-200 dark:bg-slate-700 rounded" ></div >
-            </div >
+            <div className="space-y-4">
+                <div className="card animate-pulse">
+                    <div className="h-32 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    {[...Array(5)].map((_, i) => (
+                        <div key={i} className="h-24 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+                    ))}
+                </div>
+            </div>
         );
     }
 
     return (
-        <div className="card bg-gradient-to-br from-primary-500 to-primary-600 text-white">
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="text-primary-100 text-sm font-medium mb-1">This Month</p>
-                    <h2 className="text-4xl font-bold">{stats?.totalMeals || 0}</h2>
-                    <p className="text-primary-100 mt-1">Meals Taken</p>
+        <div className="space-y-4">
+            {/* Main Stats Card */}
+            <div className="card bg-gradient-to-br from-primary-500 to-primary-600 text-white">
+                <div className="mb-4">
+                    <p className="text-primary-100 text-sm font-medium">
+                        {stats?.month} {stats?.year}
+                    </p>
                 </div>
-                <div className="bg-white/20 p-4 rounded-full">
-                    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+
+                <div className="grid grid-cols-2 gap-6">
+                    {/* Meals Taken */}
+                    <div>
+                        <p className="text-primary-100 text-sm font-medium mb-1">Meals Taken</p>
+                        <h2 className="text-4xl font-bold">{stats?.mealsTaken || 0}</h2>
+                        <p className="text-primary-100 text-xs mt-1">Up to today</p>
+                    </div>
+
+                    {/* Total Planned */}
+                    <div>
+                        <p className="text-primary-100 text-sm font-medium mb-1">Total Planned</p>
+                        <h2 className="text-4xl font-bold">{stats?.totalMealsPlanned || 0}</h2>
+                        <p className="text-primary-100 text-xs mt-1">Including future</p>
+                    </div>
                 </div>
             </div>
 
-            {stats && (
-                <div className="mt-4 pt-4 border-t border-white/20 grid grid-cols-3 gap-2 text-sm">
-                    <div>
-                        <p className="text-primary-100">Lunch</p>
-                        <p className="font-semibold">{stats.lunchCount}</p>
+            {/* Meal Type Breakdown */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {mealTypeCards.map((meal) => (
+                    <div
+                        key={meal.label}
+                        className={`p-4 bg-gradient-to-br ${meal.color} text-white rounded-lg shadow-lg`}
+                    >
+                        <div className="flex flex-col items-center text-center">
+                            <div className="text-3xl mb-2">{meal.icon}</div>
+                            <p className="text-white/90 text-xs font-medium mb-1">{meal.label}</p>
+                            <p className="text-2xl font-bold">{meal.count}</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-primary-100">Snacks</p>
-                        <p className="font-semibold">{stats.snacksCount}</p>
-                    </div>
-                    <div>
-                        <p className="text-primary-100">Dinner</p>
-                        <p className="font-semibold">{stats.optionalDinnerCount}</p>
-                    </div>
-                </div>
-            )}
+                ))}
+            </div>
         </div>
     );
 };
