@@ -1,7 +1,6 @@
 import cron from 'node-cron';
 import { prisma } from '../config/prismaClient.js';
 import { getTomorrow, formatDateForDB } from '../utils/dateHelpers';
-import e from 'express';
 
 export const createTomorrowRecords = async () => {
   console.log('Starting daily record creation job...');
@@ -95,6 +94,30 @@ export const createTomorrowRecords = async () => {
     console.log(`Created ${createdCount} new records`);
     console.log(`updated ${updatedCount} records`);
     console.log(`Records created for: ${tomorrow.toDateString()}`);
+
+    // Step 5: Check if tomorrow falls within a global WFH period.
+    // If so, override all tomorrow's records: workFromHome=true, all meals=false.
+    const globalWFH = await prisma.globalWFHPeriod.findFirst({
+      where: {
+        dateFrom: { lte: tomorrow },
+        dateTo: { gte: tomorrow },
+      },
+    });
+
+    if (globalWFH) {
+      await prisma.mealRecord.updateMany({
+        where: { date: tomorrow },
+        data: {
+          workFromHome: true,
+          lunch: false,
+          snacks: false,
+          iftar: false,
+          eventDinner: false,
+          optionalDinner: false,
+        },
+      });
+      console.log(`Global WFH override applied for ${tomorrow.toDateString()}: ${globalWFH.note ?? 'no note'}`);
+    }
   } catch (error) {
     console.error('Daily record creation failed:', error);
   }
