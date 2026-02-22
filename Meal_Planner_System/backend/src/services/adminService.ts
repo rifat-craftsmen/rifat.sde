@@ -140,6 +140,12 @@ export const getDailyHeadcount = async (date: Date) => {
     }
   });
 
+  // Get occasion name from meal schedule for this date
+  const mealSchedule = await prisma.mealSchedule.findUnique({
+    where: { date: targetDate },
+    select: { occasionName: true }
+  });
+
   // Meal totals
   const mealTotals = {
     lunch: records.filter(r => r.lunch).length,
@@ -215,7 +221,8 @@ export const getDailyHeadcount = async (date: Date) => {
     workLocationSplit: { office: officeCount, wfh: wfhCount },
     overallTotal,
     globalWFHActive: !!globalWFH,
-    globalWFHNote: globalWFH?.note || null
+    globalWFHNote: globalWFH?.note || null,
+    occasionName: mealSchedule?.occasionName || null
   };
 };
 
