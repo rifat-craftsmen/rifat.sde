@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import MonthlyStatsCard from '../components/employee/MonthlyStatsCard';
 import SevenDayGrid from '../components/employee/SevenDayGrid';
 
+type Tab = 'schedule' | 'statistics';
+
 const EmployeeDashboard: React.FC = () => {
     const { user, logout } = useAuth();
+    const [activeTab, setActiveTab] = useState<Tab>('schedule');
 
     const handleLogout = async () => {
         try {
@@ -24,7 +27,7 @@ const EmployeeDashboard: React.FC = () => {
                             Welcome, {user?.name}!
                         </h1>
                         <p className="text-slate-600 dark:text-slate-400 mt-1">
-                            Manage your meal preferences for the next 7 days
+                            Manage your meal preferences and track your monthly stats
                         </p>
                         {user?.team && (
                             <div className="mt-2">
@@ -45,15 +48,43 @@ const EmployeeDashboard: React.FC = () => {
                     </button>
                 </div>
 
-                {/* Monthly Stats */}
-                <div className="mb-8 animate-slide-up">
-                    <MonthlyStatsCard />
+                {/* Tabs */}
+                <div className="mb-6 border-b border-slate-200 dark:border-slate-700">
+                    <nav className="flex gap-1">
+                        <button
+                            onClick={() => setActiveTab('schedule')}
+                            className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors -mb-px ${
+                                activeTab === 'schedule'
+                                    ? 'border border-b-white dark:border-b-slate-900 border-slate-200 dark:border-slate-700 text-primary-600 dark:text-primary-400 bg-white dark:bg-slate-900'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                            }`}
+                        >
+                            📅 Schedule
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('statistics')}
+                            className={`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-colors -mb-px ${
+                                activeTab === 'statistics'
+                                    ? 'border border-b-white dark:border-b-slate-900 border-slate-200 dark:border-slate-700 text-primary-600 dark:text-primary-400 bg-white dark:bg-slate-900'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                            }`}
+                        >
+                            📊 Statistics
+                        </button>
+                    </nav>
                 </div>
 
-                {/* 7-Day Grid */}
-                <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
-                    <SevenDayGrid />
-                </div>
+                {/* Tab Content */}
+                {activeTab === 'schedule' && (
+                    <div className="animate-slide-up">
+                        <SevenDayGrid />
+                    </div>
+                )}
+                {activeTab === 'statistics' && (
+                    <div className="animate-slide-up">
+                        <MonthlyStatsCard />
+                    </div>
+                )}
             </div>
         </div>
     );
