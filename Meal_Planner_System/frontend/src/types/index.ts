@@ -74,6 +74,7 @@ export interface HeadcountData {
     overallTotal: number;
     globalWFHActive?: boolean;
     globalWFHNote?: string | null;
+    occasionName?: string | null;
 }
 
 export interface MonthlyStats {

@@ -152,6 +152,11 @@ const HeadcountReportsTab: React.FC = () => {
                         {headcount.globalWFHNote && <span className="ml-2">- {headcount.globalWFHNote}</span>}
                     </div>
                 )}
+                {headcount?.occasionName && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-full text-sm font-medium text-amber-800 dark:text-amber-300">
+                        🎉 {headcount.occasionName}
+                    </div>
+                )}
             </div>
 
             {/* Overall Total & Work Location Split */}
