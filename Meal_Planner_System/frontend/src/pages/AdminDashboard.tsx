@@ -24,11 +24,11 @@ const AdminDashboard: React.FC = () => {
 
     const tabs = [
         { id: 'my-meals' as TabType, label: 'My Meals', icon: '🍱' },
-        { id: 'users' as TabType, label: 'User Management', icon: '👥' },
-        { id: 'schedules' as TabType, label: 'Schedule Management', icon: '📅' },
-        { id: 'proxy' as TabType, label: 'Employee Proxy', icon: '✏️' },
-        { id: 'headcount' as TabType, label: 'Headcount Reports', icon: '📊' },
-        { id: 'participation' as TabType, label: 'Daily Participation', icon: '📋' },
+        { id: 'users' as TabType, label: 'Users', icon: '👥' },
+        { id: 'schedules' as TabType, label: 'Schedules', icon: '📅' },
+        { id: 'proxy' as TabType, label: 'Proxy', icon: '✏️' },
+        { id: 'headcount' as TabType, label: 'Headcount', icon: '📊' },
+        { id: 'participation' as TabType, label: 'Participation', icon: '📋' },
         { id: 'global-wfh' as TabType, label: 'Global WFH', icon: '🏠' },
     ];
 
