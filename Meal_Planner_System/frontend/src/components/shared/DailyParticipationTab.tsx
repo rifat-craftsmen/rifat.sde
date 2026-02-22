@@ -37,6 +37,7 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
     const queryClient = useQueryClient();
     const [selectedDate, setSelectedDate] = useState(formatDateForAPI(new Date()));
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [showOverLimitOnly, setShowOverLimitOnly] = useState(false);
 
     // A date is "future" (editable) if it's strictly after today
     const today = formatDateForAPI(new Date());
@@ -65,15 +66,18 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
     });
 
     const employees = data?.employees ?? [];
+    const displayedEmployees = showOverLimitOnly
+        ? employees.filter((e) => e.wfhDaysThisMonth > 5)
+        : employees;
 
-    const allSelected = employees.length > 0 && selectedIds.size === employees.length;
+    const allSelected = displayedEmployees.length > 0 && selectedIds.size === displayedEmployees.length;
     const someSelected = selectedIds.size > 0 && !allSelected;
 
     const toggleAll = () => {
         if (allSelected) {
             setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(employees.map((e) => e.id)));
+            setSelectedIds(new Set(displayedEmployees.map((e) => e.id)));
         }
     };
 
@@ -125,6 +129,7 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
                         onChange={(e) => {
                             setSelectedDate(e.target.value);
                             setSelectedIds(new Set());
+                            setShowOverLimitOnly(false);
                         }}
                         className="input-field max-w-xs"
                     />
@@ -135,14 +140,29 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
                     )}
                 </div>
 
-                {/* WFH Limit Crossed */}
-                <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">WFH Limit Crossed</p>
+                {/* WFH Limit Crossed — click to toggle filter */}
+                <button
+                    onClick={() => setShowOverLimitOnly((prev) => !prev)}
+                    disabled={!data || data.wfhOverLimitCount === 0}
+                    className={`p-4 rounded-lg border flex flex-col justify-center text-left transition-colors disabled:cursor-default ${
+                        showOverLimitOnly
+                            ? 'bg-red-50 dark:bg-red-900/20 border-red-400 dark:border-red-600 ring-2 ring-red-400 dark:ring-red-600'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-red-300 dark:hover:border-red-700'
+                    }`}
+                >
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                        WFH Limit Crossed
+                        {data && data.wfhOverLimitCount > 0 && (
+                            <span className="ml-2 normal-case text-red-500 dark:text-red-400">
+                                {showOverLimitOnly ? '— click to show all' : '— click to filter'}
+                            </span>
+                        )}
+                    </p>
                     <p className={`text-3xl font-bold ${data && data.wfhOverLimitCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-white'}`}>
                         {data?.wfhOverLimitCount ?? '—'}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">employees over 5 WFH days</p>
-                </div>
+                </button>
 
                 {/* Total Extra WFH Days */}
                 <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
@@ -206,10 +226,13 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
             {/* Table */}
             <div className="card">
                 <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">
-                    {teamScope ? 'Team Participation' : 'Daily Participation'} ({employees.length} people)
+                    {teamScope ? 'Team Participation' : 'Daily Participation'} ({displayedEmployees.length}{showOverLimitOnly ? ` of ${employees.length}` : ''} people)
+                    {showOverLimitOnly && (
+                        <span className="ml-2 text-sm font-normal text-red-500 dark:text-red-400">— over WFH limit only</span>
+                    )}
                 </h3>
 
-                {employees.length > 0 ? (
+                {displayedEmployees.length > 0 ? (
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                             <thead className="bg-slate-50 dark:bg-slate-800">
@@ -264,7 +287,7 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
-                                {employees.map((employee) => {
+                                {displayedEmployees.map((employee) => {
                                     const isSelected = selectedIds.has(employee.id);
                                     return (
                                         <tr
