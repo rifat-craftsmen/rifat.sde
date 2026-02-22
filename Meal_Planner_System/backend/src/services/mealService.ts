@@ -127,7 +127,7 @@ export const addOrUpdateMealRecord = async (
         eventDinner: data.eventDinner,
         optionalDinner: data.optionalDinner,
         workFromHome: data.workFromHome ?? existingRecord.workFromHome,
-        lastModifiedBy: modifiedBy || null,
+        lastModifiedBy: modifiedBy ?? userId,
         notificationSent: false,
       },
     });
@@ -143,7 +143,7 @@ export const addOrUpdateMealRecord = async (
         eventDinner: data.eventDinner,
         optionalDinner: data.optionalDinner,
         workFromHome: data.workFromHome ?? false,
-        lastModifiedBy: modifiedBy || null,
+        lastModifiedBy: modifiedBy ?? userId,
         notificationSent: false,
       },
     });
