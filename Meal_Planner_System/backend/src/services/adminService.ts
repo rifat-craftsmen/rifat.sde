@@ -214,6 +214,21 @@ export const getDailyHeadcount = async (date: Date) => {
   // Overall total (sum of all meals)
   const overallTotal = Object.values(mealTotals).reduce((sum, count) => sum + count, 0);
 
+  // WFH over-limit stats for the current calendar month
+  const { start: monthStart, end: monthEnd } = getCurrentMonthRange();
+  const wfhMonthlyCounts = await prisma.mealRecord.groupBy({
+    by: ['userId'],
+    where: {
+      date: { gte: monthStart, lte: monthEnd },
+      workFromHome: true,
+    },
+    _count: { id: true },
+  });
+  const wfhOverLimitCount = wfhMonthlyCounts.filter(r => r._count.id > 5).length;
+  const totalExtraWFHDays = wfhMonthlyCounts
+    .filter(r => r._count.id > 5)
+    .reduce((sum, r) => sum + (r._count.id - 5), 0);
+
   return {
     date: targetDate,
     mealTotals,
@@ -222,7 +237,9 @@ export const getDailyHeadcount = async (date: Date) => {
     overallTotal,
     globalWFHActive: !!globalWFH,
     globalWFHNote: globalWFH?.note || null,
-    occasionName: mealSchedule?.occasionName || null
+    occasionName: mealSchedule?.occasionName || null,
+    wfhOverLimitCount,
+    totalExtraWFHDays,
   };
 };
 

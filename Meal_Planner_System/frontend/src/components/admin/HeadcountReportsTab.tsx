@@ -193,6 +193,24 @@ const HeadcountReportsTab: React.FC = () => {
                 </div>
             </div>
 
+            {/* WFH Over-Limit Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">WFH Limit Crossed</p>
+                    <p className={`text-3xl font-bold ${headcount && headcount.wfhOverLimitCount && headcount.wfhOverLimitCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-white'}`}>
+                        {headcount?.wfhOverLimitCount ?? '—'}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">employees over 5 WFH days this month</p>
+                </div>
+                <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Total Extra WFH Days</p>
+                    <p className={`text-3xl font-bold ${headcount && headcount.totalExtraWFHDays && headcount.totalExtraWFHDays > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-white'}`}>
+                        {headcount?.totalExtraWFHDays ?? '—'}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">days beyond the 5-day allowance this month</p>
+                </div>
+            </div>
+
             {/* Meal Headcount Cards */}
             <div className="mb-6">
                 <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-3">Meal Type Breakdown</h3>

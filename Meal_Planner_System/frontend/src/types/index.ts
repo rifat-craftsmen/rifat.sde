@@ -75,6 +75,8 @@ export interface HeadcountData {
     globalWFHActive?: boolean;
     globalWFHNote?: string | null;
     occasionName?: string | null;
+    wfhOverLimitCount?: number;
+    totalExtraWFHDays?: number;
 }
 
 export interface MonthlyStats {
