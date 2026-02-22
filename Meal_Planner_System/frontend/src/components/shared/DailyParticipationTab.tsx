@@ -17,10 +17,13 @@ interface Employee {
     };
     lastModifiedByName: string | null;
     lastModifiedAt: string | null;
+    wfhDaysThisMonth: number;
 }
 
 interface DailyParticipationData {
     date: string;
+    wfhOverLimitCount: number;
+    totalExtraWFHDays: number;
     employees: Employee[];
 }
 
@@ -108,26 +111,47 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
 
     return (
         <div>
-            {/* Date Picker */}
-            <div className="card mb-4">
-                <label htmlFor="participation-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Select Date
-                </label>
-                <input
-                    id="participation-date"
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => {
-                        setSelectedDate(e.target.value);
-                        setSelectedIds(new Set());
-                    }}
-                    className="input-field max-w-xs"
-                />
-                {!isFutureDate && (
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                        Bulk actions are only available for future dates.
+            {/* Date Picker + WFH Summary Cards — single row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {/* Date Picker */}
+                <div className="card">
+                    <label htmlFor="participation-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Select Date
+                    </label>
+                    <input
+                        id="participation-date"
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => {
+                            setSelectedDate(e.target.value);
+                            setSelectedIds(new Set());
+                        }}
+                        className="input-field max-w-xs"
+                    />
+                    {!isFutureDate && (
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                            Bulk actions are only available for future dates.
+                        </p>
+                    )}
+                </div>
+
+                {/* WFH Limit Crossed */}
+                <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">WFH Limit Crossed</p>
+                    <p className={`text-3xl font-bold ${data && data.wfhOverLimitCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-white'}`}>
+                        {data?.wfhOverLimitCount ?? '—'}
                     </p>
-                )}
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">employees over 5 WFH days</p>
+                </div>
+
+                {/* Total Extra WFH Days */}
+                <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Total Extra WFH Days</p>
+                    <p className={`text-3xl font-bold ${data && data.totalExtraWFHDays > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-white'}`}>
+                        {data?.totalExtraWFHDays ?? '—'}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">days beyond the 5-day allowance</p>
+                </div>
             </div>
 
             {/* Bulk Action Bar — only for future dates when rows are selected */}
@@ -228,6 +252,9 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
                                     <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                         🍽️ Optional
                                     </th>
+                                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        WFH Taken
+                                    </th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                         Modified By
                                     </th>
@@ -283,6 +310,11 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
                                             <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.iftar)}</td>
                                             <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.eventDinner)}</td>
                                             <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.optionalDinner)}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`text-sm font-semibold ${employee.wfhDaysThisMonth > 5 ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                    {employee.wfhDaysThisMonth}
+                                                </span>
+                                            </td>
                                             <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
                                                 {employee.lastModifiedByName ?? '—'}
                                             </td>

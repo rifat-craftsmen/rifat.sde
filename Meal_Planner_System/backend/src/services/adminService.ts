@@ -1,5 +1,5 @@
 import { prisma } from '../config/prismaClient.js';
-import { formatDateForDB, parseDateString } from '../utils/dateHelpers';
+import { formatDateForDB, parseDateString, getCurrentMonthRange } from '../utils/dateHelpers';
 import { CreateScheduleData, BulkMealUpdateData, CreateGlobalWFHData } from '../types';
 
 // Get all teams
@@ -277,31 +277,55 @@ export const getDailyParticipation = async (date: Date, teamId?: number) => {
 
   const modifierMap = new Map(modifiers.map(m => [m.id, m.name]));
 
+  // Count WFH days per user for the current calendar month in one query
+  const { start: monthStart, end: monthEnd } = getCurrentMonthRange();
+  const wfhCounts = await prisma.mealRecord.groupBy({
+    by: ['userId'],
+    where: {
+      userId: { in: users.map(u => u.id) },
+      date: { gte: monthStart, lte: monthEnd },
+      workFromHome: true,
+    },
+    _count: { id: true },
+  });
+  const wfhCountMap = new Map(wfhCounts.map(r => [r.userId, r._count.id]));
+
+  const employees = users.map(user => {
+    const record = user.records[0]; // Will be undefined if no record exists
+    const wfhDaysThisMonth = wfhCountMap.get(user.id) ?? 0;
+
+    return {
+      id: user.id,
+      name: user.name,
+      teamName: user.team?.name || null,
+      workFromHome: record?.workFromHome ?? false,
+      meals: {
+        lunch: record?.lunch ?? null,
+        snacks: record?.snacks ?? null,
+        iftar: record?.iftar ?? null,
+        eventDinner: record?.eventDinner ?? null,
+        optionalDinner: record?.optionalDinner ?? null
+      },
+      lastModifiedByName: record == null
+        ? null                                                    // no record at all → —
+        : record.lastModifiedBy == null
+          ? 'System'                                              // record exists, no user ID → cron
+          : (modifierMap.get(record.lastModifiedBy) ?? null),    // user/admin/lead → their name
+      lastModifiedAt: record?.updatedAt?.toISOString() ?? null,
+      wfhDaysThisMonth,
+    };
+  });
+
+  const wfhOverLimitCount = employees.filter(e => e.wfhDaysThisMonth > 5).length;
+  const totalExtraWFHDays = employees
+    .filter(e => e.wfhDaysThisMonth > 5)
+    .reduce((sum, e) => sum + (e.wfhDaysThisMonth - 5), 0);
+
   return {
     date: targetDate.toISOString(),
-    employees: users.map(user => {
-      const record = user.records[0]; // Will be undefined if no record exists
-
-      return {
-        id: user.id,
-        name: user.name,
-        teamName: user.team?.name || null,
-        workFromHome: record?.workFromHome ?? false,
-        meals: {
-          lunch: record?.lunch ?? null,
-          snacks: record?.snacks ?? null,
-          iftar: record?.iftar ?? null,
-          eventDinner: record?.eventDinner ?? null,
-          optionalDinner: record?.optionalDinner ?? null
-        },
-        lastModifiedByName: record == null
-          ? null                                                    // no record at all → —
-          : record.lastModifiedBy == null
-            ? 'System'                                              // record exists, no user ID → cron
-            : (modifierMap.get(record.lastModifiedBy) ?? null),    // user/admin/lead → their name
-        lastModifiedAt: record?.updatedAt?.toISOString() ?? null,
-      };
-    })
+    wfhOverLimitCount,
+    totalExtraWFHDays,
+    employees,
   };
 };
 
