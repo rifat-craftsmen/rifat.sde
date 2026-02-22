@@ -245,11 +245,37 @@ export const getDailyParticipation = async (date: Date, teamId?: number) => {
       },
       records: {
         where: { date: targetDate },
-        take: 1
+        take: 1,
+        select: {
+          lunch: true,
+          snacks: true,
+          iftar: true,
+          eventDinner: true,
+          optionalDinner: true,
+          workFromHome: true,
+          lastModifiedBy: true,
+          updatedAt: true,
+        }
       }
     },
     orderBy: { name: 'asc' }
   });
+
+  // Collect unique modifier IDs to resolve their names in one query
+  const modifierIds = [...new Set(
+    users
+      .map(u => u.records[0]?.lastModifiedBy)
+      .filter((id): id is number => id != null)
+  )];
+
+  const modifiers = modifierIds.length > 0
+    ? await prisma.user.findMany({
+        where: { id: { in: modifierIds } },
+        select: { id: true, name: true }
+      })
+    : [];
+
+  const modifierMap = new Map(modifiers.map(m => [m.id, m.name]));
 
   return {
     date: targetDate.toISOString(),
@@ -267,7 +293,13 @@ export const getDailyParticipation = async (date: Date, teamId?: number) => {
           iftar: record?.iftar ?? null,
           eventDinner: record?.eventDinner ?? null,
           optionalDinner: record?.optionalDinner ?? null
-        }
+        },
+        lastModifiedByName: record == null
+          ? null                                                    // no record at all → —
+          : record.lastModifiedBy == null
+            ? 'System'                                              // record exists, no user ID → cron
+            : (modifierMap.get(record.lastModifiedBy) ?? null),    // user/admin/lead → their name
+        lastModifiedAt: record?.updatedAt?.toISOString() ?? null,
       };
     })
   };

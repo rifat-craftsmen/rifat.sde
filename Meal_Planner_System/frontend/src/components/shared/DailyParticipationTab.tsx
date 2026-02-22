@@ -15,6 +15,8 @@ interface Employee {
         eventDinner: boolean | null;
         optionalDinner: boolean | null;
     };
+    lastModifiedByName: string | null;
+    lastModifiedAt: string | null;
 }
 
 interface DailyParticipationData {
@@ -226,6 +228,12 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
                                     <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                         🍽️ Optional
                                     </th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        Modified By
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        Updated At
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-700">
@@ -275,6 +283,17 @@ const DailyParticipationTab: React.FC<Props> = ({ teamScope = false }) => {
                                             <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.iftar)}</td>
                                             <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.eventDinner)}</td>
                                             <td className="px-4 py-3 text-center">{renderCheckIcon(employee.meals.optionalDinner)}</td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
+                                                {employee.lastModifiedByName ?? '—'}
+                                            </td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
+                                                {employee.lastModifiedAt
+                                                    ? new Date(employee.lastModifiedAt).toLocaleString('en-US', {
+                                                        month: 'short', day: 'numeric',
+                                                        hour: '2-digit', minute: '2-digit',
+                                                      })
+                                                    : '—'}
+                                            </td>
                                         </tr>
                                     );
                                 })}
