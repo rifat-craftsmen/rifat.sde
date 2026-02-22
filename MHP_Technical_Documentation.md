@@ -1,69 +1,46 @@
 ## Meal Headcount Planner Technical Design Document
 - Author: Rifat Ahmed
-- Iteration: 2
-- Version: v1
+- Iteration: 3
+- Version: v2
 - Status: In Review
 
 ---
 
 ## 1. Summary
 
-The **Meal Headcount Planner (MHP)** is an internal web application designed to replace the current Excel-based meal tracking system for 100+ employees. The system automates daily headcount collection for multiple meal types (Lunch, Snacks, Iftar, Event Dinner, Optional Dinner) while minimizing manual data entry through a **"Default-Opt-In"** approach where all active employees are assumed to be attending meals unless they explicitly opt out.
-
-**Key Capabilities:**
-- Automated daily meal record creation for all active employees
-- 7-day advance planning window for employees to manage meal participation
-- Role-based access control (Admin, Team Lead, Employee, Logistics)
-- Real-time headcount reporting for logistics team
-- Special occasion scheduling for events and holidays
-- Proxy meal management by Team Leads and Admins
-
+The **Meal Headcount Planner (MHP)** is a centralized platform designed to streamline food logistics for 100+ employees. By shifting from manual tracking to an automated **"Default-Opt-In"** model, the system ensures every active employee is accounted for unless they choose otherwise. This transition eliminates administrative overhead, reduces food waste, and provides admin with clear, actionable data for daily operations and special events.
 
 **Expected Outcomes:**
-- Reduce logistics team workload through automation
-- Provide accurate daily headcount within seconds
-- Enable employees to plan meals up to 7 days in advance
-- Maintain complete audit trail of meal participation changes
-- Eliminate manual Excel file sharing and consolidation
+- Reduce workload of logistics team by replacing manual coordination with automated data collection.
+
+- Provide precise daily headcounts within seconds, ensuring the kitchen always has the correct numbers.
 
 
-**Key New Features added at Iteration 2:**
-1. Team-based visibility and participation tracking
-2. Bulk meal update operations for Team Leads and Admins
-3. Work location (Office/WFH) tracking per employee per date
-4. Company-wide WFH period management
-5. Enhanced headcount reporting with team breakdown and office/WFH split
-6. Daily announcement message generation
-7. Special day type presets (Office Closed, Government Holiday, etc.)
-8. Live HeadCount dashboard updates
+
+- Eliminate manual file updates and offer a user-friendly interface that removes the friction of daily manual reporting.
+
+
+- Enable employees with a 7-day advance window to manage their meal schedules.
+
+- Maintain transparent history of all meal participation changes.
+
+
+- Improve procurement accuracy by aligning food preparation with confirmed participation data, leading to reduced food waste.
+
 
 ---
+
 
 ## 2. Problem Statement
 
-### 2.1 Current State
+The organization currently relies on a manual, spreadsheet-based tracking system. This process requires every employee to manually update their status daily, forcing Team Leads to spend time chasing non-responsive members while the logistics team manually consolidates various lists before notifying the chef. This fragmented workflow has led to several issues:
 
-The organization currently uses an Excel-based system to track daily meal headcount for 100+ employees across multiple meal types. This process involves:
-
-1. A Google Sheet is shared with all employees
-2. Employees manually update their meal participation row-by-row
-3. Team Leads chase down non-responsive team members
-4. Logistics team manually consolidates responses
-5. Headcount is calculated using Excel formulas across multiple sheets
-6. Then results are notified to chef.
-
-### 2.2 Pain Points
-- **Time-Consuming**: Logistics team spends a good amount of time daily consolidating data
-- **Error-Prone**: Manual data entry may lead to incorrect headcounts
-- **Employee Satisfaction**: Manual process frustrates both employees and logistics team
-- **Late Responses**: Employees may forget to update their status
-- **Catering**: Late headcount submissions strain catering process
-- **No Historical Data**: No easy way to track meal consumption trends
-- **Version Control**: Multiple people editing the same sheet causes conflicts
-- **Access Issues**: Google Sheets authentication problems for some employees
-- **Scalability**: Process will be very hard to maintain as employee count grows beyond hundred.
-
----
+* **Operational Inefficiency:** A good amount of time is lost daily to manual data consolidation and constant follow-ups.
+* **Data Inaccuracy:** Manual entry and reconciliation often result in incorrect headcounts, leading to food waste.
+* **Logistical Strain:** Late status updates and delayed submissions put pressure on the food preparation process.
+* **Employee Frustration:** The repetitive nature of the manual process is a source of dissatisfaction for everyone.
+* **Lack of Visibility:** There is no centralized way to track consumption trends or plan for future meal requirements.
+* **Scalability Barriers:** The current approach will become difficult to maintain as the workforce grows, making a more automated solution essential.
 
 ## 3. Goals and Non-Goals
 
@@ -208,6 +185,34 @@ The organization currently uses an Excel-based system to track daily meal headco
 - FR15.1: Headcount reports must auto-refresh without relaoding when any meal status changes by any user
 
 
+**FR16: Auditability in Daily Participation View**
+- FR16.1: The Daily Participation table (visible to Team Lead and Admin) must display a "Last Modified By" column showing the `name` of the user who last updated each meal record (null/system if cron-generated or self-edited)
+- FR16.2: The Daily Participation table must display a "Modified At" column showing the `updatedAt` timestamp of each meal record
+- FR16.3: Backend must resolve `lastModifiedBy` user ID to the corresponding user's name before returning it in the daily participation response
+- FR16.4: These audit fields must reflect the most recent change — whether made by the employee, a Team Lead, or an Admin
+
+**FR17: Special Occasion Badge on Headcount View**
+- FR17.1: When a `MealSchedule` record exists for the selected date and has an `occasionName` set, the Headcount tab must display a visible badge or banner showing that occasion name
+- FR17.2: The occasion badge must appear prominently near the date picker / top of the headcount card area
+- FR17.3: Backend `GET /api/admin/headcount` must include `occasionName` in its response (null if no schedule or no name set)
+
+**FR18: WFH Over-Limit Indicators in Daily Participation**
+- FR18.1: The Daily Participation table must include a "WFH Taken" column showing each employee's WFH day count for the current month
+- FR18.2: If an employee's monthly WFH count exceeds 5 days, the value in the "WFH Taken" column must be displayed in red to indicate over-limit status
+- FR18.3: Above the Daily Participation table, two summary cards must be displayed:
+  - **"WFH Limit Exceeded"**: count of employees whose monthly WFH > 5
+  - **"Total Extra WFH Days"**: sum of (wfhCount - 5) for all employees who are over the limit
+- FR18.4: The 5-day monthly WFH allowance is a soft limit — records beyond the limit are still accepted; this is for visibility only
+- FR18.5: Backend `GET /api/admin/daily-participation` must return `wfhCount` (monthly WFH days) per employee in its response
+
+**FR19: WFH Over-Limit Filter in Daily Participation**
+- FR19.1: A filter button ("Show Over-Limit Only") must appear above the Daily Participation table
+- FR19.2: When the filter is active, only employees whose monthly WFH count exceeds 5 are shown in the table
+- FR19.3: The filter can be toggled on/off without a new API call (client-side filtering of already-loaded data)
+- FR19.4: The filter button must have a visible active/inactive state indicator
+
+
+
 ### 4.2 Non-Functional Requirements
 
 **NFR2: Security**
@@ -237,11 +242,42 @@ The organization currently uses an Excel-based system to track daily meal headco
 - NFR6.2: System architecture must allow horizontal scaling if needed
 - NFR6.3: Frontend must be optimized for low-bandwidth environments
 
+
+## 5. System Features
+
+
+The following features have been organized by functional area to provide a clear overview of the system's capabilities across all iterations.
+
+#### Core Participation Management
+* **Default-Opt-In:** Automatically creates daily meal records for all active employees.
+* **Advanced Planning Window:** Enables employees to manage and toggle their meal participation up to seven days in advance.
+* **Work Location Tracking:** Tracks Office vs. WFH status per employee per date.
+* **Proxy Management:** Allows Team Leads and Admins to manage meal participation on behalf of other employees.
+
+#### Team & Administrative Tools
+* **Team-Based Visibility:** Provides structured tracking and participation visibility organized by team.
+* **Bulk Operations:** Enables Admins and Team Leads to perform mass updates on meal participation records.
+* **WFH Management:** Features company-wide WFH period management and automated over-limit indicators, including red highlights for employees exceeding 5 days.
+* **Role-Based Access Control (RBAC):** Restricts system access and features based on assigned roles: Admin, Team Lead, Employee, and Logistics.
+* **Special Occasion Management:** Supports scheduling for special events or holidays and displays badges on the dashboard to notify users of special schedules.
+
+
+#### Logistics & Reporting
+* **Live Headcount Dashboard:** Delivers real-time updates on meal counts with breakdowns by team, meal types and work location.
+* **Daily Announcement Generation:** Automatically generates daily summary messages for catering and logistics stakeholders.
+
+#### Auditability & Controls
+* **Modification Tracking:** Maintains an audit trail via dedicated columns showing "last modified by" and "modified at" for every record.
+* **Advanced Filtering:** Includes specialized views and filters, such as the WFH over-limit filter, to identify specific employee groups.
+
+
+
+
 ---
 
-## 5. Tech Stack and Rationale
+## 6. Tech Stack and Rationale
 
-### 5.1 Technology Choices
+### 6.1 Technology Choices
 
 | Layer | Technology | Version | Rationale |
 |-------|-----------|---------|-----------|
@@ -258,7 +294,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 | **Rate Limiting** | express-rate-limit | 7.x | -  Prevents DoS/Brute-force attacks<br>- Simple middleware integration<br>- Supports custom stores (Redis, Memcached)|
 | **Date Handling** | date-fns | 3.x | - Lightweight (vs Moment.js)<br>- Modular imports<br>- Immutable date operations<br>- TypeScript native |
 
-### 5.2 Why PostgreSQL With Prisma and Docker?
+### 6.2 Why PostgreSQL With Prisma and Docker?
 
 **Decision Rationale:**
 1. **Environment Consistency**: Docker ensures the database version and configuration are identical for all developers, eliminating "it works on my machine" bugs.
@@ -276,7 +312,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 - **SQLite**: Rejected due to lack of concurrent write support and production limitations
 - **MongoDB**: Rejected due to relational data model (Users → Teams → MealRecords)
 
-### 5.3 Why TypeScript?
+### 6.3 Why TypeScript?
 
 **Benefits:**
 1. **Type Safety**: Catch errors at compile-time instead of runtime
@@ -288,9 +324,9 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ---
 
-## 6. User Flows
+## 7. User Flows
 
-### 6.1 Employee Daily Flow
+### 7.1 Employee Daily Flow
 
 **Actor:** Employee (John)
 **Goal:** Update meal participation for tomorrow
@@ -316,7 +352,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ---
 
-### 6.2 Team Lead Proxy Edit Flow
+### 7.2 Team Lead Proxy Edit Flow
 
 **Actor:** Team Lead (Sarah)
 **Goal:** Opt out an employee who forgot to update their meals
@@ -343,7 +379,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ---
 
-### 6.3 Admin Special Occasion Flow
+### 7.3 Admin Special Occasion Flow
 
 **Actor:** Admin (Alice)
 **Goal:** Set up Event Dinner for company annual party
@@ -374,7 +410,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ---
 
-### 6.4 Logistics Daily Reporting Flow
+### 7.4 Logistics Daily Reporting Flow
 
 **Actor:** Logistics Manager (Maria)
 **Goal:** Get headcount for today's meals to send to chef
@@ -399,7 +435,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ---
 
-### 6.5 Daily Cron Job Flow (System Process)
+### 7.5 Daily Cron Job Flow (System Process)
 
 **Actor:** System (automated)
 **Goal:** Create meal records for tomorrow for all active employees
@@ -446,7 +482,7 @@ The organization currently uses an Excel-based system to track daily meal headco
   - Transaction rollback if bulk insert fails
   - Special events added after user's meal selection are handled gracefully via three-state nullable boolean pattern.
 
-### 6.6 Employee WFH Selection Flow
+### 7.6 Employee WFH Selection Flow
 
 **Actor:** Employee (John)
 **Goal:** Mark himself as WFH for tomorrow
@@ -469,7 +505,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ---
 
-### 6.7 Team Lead Bulk Update Flow
+### 7.7 Team Lead Bulk Update Flow
 
 **Actor:** Team Lead (Sarah)
 **Goal:** Mark entire team as WFH for a specific date due to team offsite
@@ -503,7 +539,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 ---
 
-### 6.8 Admin Global WFH Period Flow
+### 7.8 Admin Global WFH Period Flow
 
 **Actor:** Admin (Alice)
 **Goal:** Declare company-wide WFH period for a week
@@ -535,7 +571,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 ---
 
 
-### 6.9 Logistics Daily Announcement Flow
+### 7.9 Logistics Daily Announcement Flow
 
 **Actor:** Logistics Manager (Maria)
 **Goal:** Generate announcement for today's meal headcount
@@ -577,12 +613,45 @@ The organization currently uses an Excel-based system to track daily meal headco
 7. Maria clicks "Copy" button
 8. System copies message to clipboard
 
+---
+
+
+### 7.10 Admin/Lead Viewing Audit Trail and WFH Over-Limit Report
+
+**Actor:** Admin (Alice) or Team Lead (Sarah)
+**Goal:** Identify who changed a participation entry and flag employees over WFH limit
+
+**Steps:**
+1. Alice logs into Admin dashboard and navigates to "Daily Participation" tab
+2. Selects today's date
+3. System fetches participation data including:
+   - Per-employee WFH count for the current month
+   - Last modifier name and timestamp for each meal record
+4. Table displays all employees with columns:
+   - Name, Team, Location, Meal checkboxes, **WFH Taken**, **Last Modified By**, **Modified At**
+5. Alice notices John's "WFH Taken" value is **7** — shown in red (over 5-day limit)
+6. Alice sees "Last Modified By: Sarah (Team Lead)" and "Modified At: Feb 19, 10:32 AM" on John's row — confirming Sarah made the most recent change
+7. Above the table, two summary cards show:
+   - **WFH Limit Exceeded**: 3 employees
+   - **Total Extra WFH Days**: 5 days
+8. Alice clicks "Show Over-Limit Only" filter button
+9. Table immediately narrows to show only the 3 employees exceeding the WFH allowance
+10. Alice clicks "Show Over-Limit Only" again to clear the filter and see all employees
+
+**Occasion Badge Flow:**
+1. Alice switches to "Headcount Reports" tab
+2. Selects March 15 (a date with a special occasion schedule)
+3. System shows the standard headcount cards
+4. A purple badge reads: **🎉 Company Annual Celebration** — displayed above the headcount cards
+5. Alice confirms the occasion is active before generating the daily announcement
+
+
 
 ---
 
-## 7. Design
+## 8. Design
 
-### 7.1 System Architecture
+### 8.1 System Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -644,7 +713,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### 7.2 Database Schema Design
+### 8.2 Database Schema Design
 
 **Entity Relationship Overview:**
 
@@ -652,7 +721,8 @@ The organization currently uses an Excel-based system to track daily meal headco
 ┌─────────────┐
 │    User     │
 ├─────────────┤
-│ id (PK)     ├───┐
+│ id (PK)     ├
+| name        |───┐
 │ email       │   │
 │ password    │   │
 │ role        │   │
@@ -739,7 +809,10 @@ The organization currently uses an Excel-based system to track daily meal headco
 
 **MealRecord Table:**
 - Stores individual employee meal participation
-- Fields: id, userId (FK), date, meal participation flags (boolean), lastModifiedBy, notificationSent
+- Fields: id, userId (FK), date, meal participation flags (boolean), workFromHome, lastModifiedBy, updatedAt, notificationSent
+- `lastModifiedBy`: tracks who last changed the record — null means cron-generated or self-edited; a non-null value is the userId of the Team Lead or Admin who made the change
+- `updatedAt`: Prisma auto-managed timestamp — updated on every write. Now surfaced in the Daily Participation view to provide a full audit trail
+- Both `lastModifiedBy` and `updatedAt` were present in the schema since Iteration 1; they are **newly exposed** in the daily participation API response in Iteration 3
 - Unique constraint: (userId, date) prevents duplicates
 - lastModifiedBy tracks proxy edits (null = self-edit, otherwise Team Lead/Admin ID)
 - notificationSent prepared for future notification feature (false = notification pending)
@@ -751,7 +824,7 @@ The organization currently uses an Excel-based system to track daily meal headco
 - MealSchedule: date (optimize daily schedule lookups)
 - MealRecord: date, userId (optimize headcount queries and user schedule retrieval)
 
-### 7.3 API Design
+### 8.3 API Design
 
 **RESTful Endpoint Structure:**
 
@@ -782,6 +855,8 @@ The organization currently uses an Excel-based system to track daily meal headco
 | GET | `/api/admin/global-wfh` | ADMIN | Get all global WFH periods |
 | DELETE | `/api/admin/global-wfh/:id` | ADMIN | Delete global WFH period |
 | POST | `/api/admin/generate-announcement` | ADMIN, LOGISTICS | Generate daily announcement message |
+| GET | `/api/admin/daily-participation?date=YYYY-MM-DD` | LEAD, ADMIN | Get daily participation (team-filtered for LEAD). **[Iter 3]** Now also returns per-employee `wfhCount` (monthly WFH days), `lastModifiedByName` (resolved user name or null), and `updatedAt` |
+| GET | `/api/admin/headcount?date=YYYY-MM-DD` | ADMIN, LOGISTICS | Get daily headcount. **[Iter 3]** Now also returns `occasionName` (from MealSchedule for that date, or null) |
 
 
 **Sample Request/Response:**
@@ -816,7 +891,9 @@ The organization currently uses an Excel-based system to track daily meal headco
 }
 ```
 
-### 7.4 Frontend Component Hierarchy
+
+
+### 8.4 Frontend Component Hierarchy
 
 ```
 App
@@ -846,6 +923,10 @@ App
 │       │       │   └── DailyParticipationTab (teamScope=true)
 │       │       │       ├── DatePicker
 │       │       │       ├── StatusMessage (read-only/editable)
+│       │       │       ├── WFHSummaryCards 
+│       │       │       │   ├── WFHLimitExceededCard
+│       │       │       │   └── TotalExtraWFHDaysCard
+│       │       │       ├── OverLimitFilterButton 
 │       │       │       ├── BulkActionsToolbar (if editable)
 │       │       │       │   ├── WFH for All Button
 │       │       │       │   ├── All Off Button
@@ -855,9 +936,11 @@ App
 │       │       │           └── EmployeeRow
 │       │       │               ├── SelectCheckbox
 │       │       │               ├── Name
-│       │       │               ├── Team
 │       │       │               ├── LocationBadge (Office/WFH)
-│       │       │               └── MealColumns (5 meal types)
+│       │       │               ├── MealColumns (5 meal types)
+│       │       │               ├── WFHTakenColumn  (red if > 5)
+│       │       │               ├── LastModifiedByColumn 
+│       │       │               └── ModifiedAtColumn 
 │       │       │
 │       │       └── Search & Edit Tab
 │       │           └── EmployeeProxyTab
@@ -869,6 +952,9 @@ App
 │       │
 │       ├── AdminDashboard  
 │       │   └── Tabs
+│       │       ├── My Meals Tab
+│       │       │   └── SevenDayGrid
+│       │       │
 │       │       ├── UserManagementTab
 │       │       │   ├── CreateUserButton → CreateUserModal
 │       │       │   │   └── UserForm
@@ -883,7 +969,7 @@ App
 │       │       │   ├── CreateScheduleButton → CreateScheduleModal
 │       │       │   │   └── ScheduleForm
 │       │       │   │       ├── DatePicker
-│       │       │   │       ├── SpecialDayTypeDropdown (NEW)
+│       │       │   │       ├── SpecialDayTypeDropdown
 │       │       │   │       │   ├── Office Closed
 │       │       │   │       │   ├── Government Holiday
 │       │       │   │       │   ├── Special Celebration
@@ -901,10 +987,39 @@ App
 │       │       │   └── EmployeeEditModal
 │       │       │       └── SevenDayGrid
 │       │       │
+│       │       ├── HeadcountReportsTab
+│       │       │   ├── DatePicker
+│       │       │   ├── GlobalWFHBanner (if active)
+│       │       │   ├── OccasionBadge  (if occasionName exists for date)
+│       │       │   ├── TotalEmployeesCard
+│       │       │   ├── MealHeadcountCards (5 meal types)
+│       │       │   ├── TeamBreakdownCards  
+│       │       │   │   └── TeamCard
+│       │       │   │       ├── TeamName
+│       │       │   │       ├── TotalMeals
+│       │       │   │       └── MealTypeBreakdown
+│       │       │   │           ├── Lunch count
+│       │       │   │           ├── Snacks count
+│       │       │   │           ├── Iftar count
+│       │       │   │           ├── Event Dinner count
+│       │       │   │           └── Optional Dinner count
+│       │       │   ├── OfficeWFHSplitCards
+│       │       │   │   ├── OfficeCard
+│       │       │   │   └── WFHCard
+│       │       │   ├── OverallTotalCard
+│       │       │   └── GenerateAnnouncementButton
+│       │       │       └── AnnouncementModal
+│       │       │           ├── MessageTextArea
+│       │       │           └── CopyButton
+│       │       │
 │       │       ├── Daily Participation Tab  
 │       │       │   └── DailyParticipationTab (teamScope=false)
 │       │       │       ├── DatePicker
 │       │       │       ├── StatusMessage (read-only/editable)
+│       │       │       ├── WFHSummaryCards 
+│       │       │       │   ├── WFHLimitExceededCard
+│       │       │       │   └── TotalExtraWFHDaysCard
+│       │       │       ├── OverLimitFilterButton 
 │       │       │       ├── BulkActionsToolbar (if editable)
 │       │       │       │   ├── WFH for All Button
 │       │       │       │   ├── All Off Button
@@ -916,33 +1031,12 @@ App
 │       │       │               ├── Name
 │       │       │               ├── Team
 │       │       │               ├── LocationBadge (Office/WFH)
-│       │       │               └── MealColumns (5 meal types)
+│       │       │               ├── MealColumns (5 meal types)
+│       │       │               ├── WFHTakenColumn  (red if > 5)
+│       │       │               ├── LastModifiedByColumn 
+│       │       │               └── ModifiedAtColumn 
 │       │       │
-│       │       ├── HeadcountReportsTab 
-│       │       │   ├── DatePicker
-│       │       │   ├── GlobalWFHBanner (if active)
-│       │       │   ├── TotalEmployeesCard
-│       │       │   ├── MealHeadcountCards (5 meal types)
-│       │       │   ├── TeamBreakdownCards  
-│       │       │   │   └── TeamCard
-│       │       │   │       ├── TeamName
-│       │       │   │       ├── TotalMeals
-│       │       │   │       └── MealTypeBreakdown (NEW)
-│       │       │   │           ├── Lunch count
-│       │       │   │           ├── Snacks count
-│       │       │   │           ├── Iftar count
-│       │       │   │           ├── Event Dinner count
-│       │       │   │           └── Optional Dinner count
-│       │       │   ├── OfficeWFHSplitCards 
-│       │       │   │   ├── OfficeCard
-│       │       │   │   └── WFHCard
-│       │       │   ├── OverallTotalCard 
-│       │       │   └── GenerateAnnouncementButton 
-│       │       │       └── AnnouncementModal
-│       │       │           ├── MessageTextArea
-│       │       │           └── CopyButton
-│       │       │
-│       │       └── Global WFH Tab 
+│       │       └── Global WFH Tab
 │       │           └── GlobalWFHTab
 │       │               ├── CreateWFHPeriodForm
 │       │               │   ├── DateFromPicker
@@ -959,21 +1053,23 @@ App
 │       └── LogisticsDashboard  
 │           ├── DatePicker
 │           ├── GlobalWFHBanner (if active)
+│           ├── OccasionBadge  (if occasionName exists for date)
 │           ├── MealHeadcountCards
-│           ├── TeamBreakdownCards 
-│           ├── OfficeWFHSplitCards 
-│           ├── OverallTotalCard 
-│           └── GenerateAnnouncementButton 
+│           ├── TeamBreakdownCards
+│           ├── OfficeWFHSplitCards
+│           ├── OverallTotalCard
+│           └── GenerateAnnouncementButton
 │
 └── LoginPage
     └── LoginForm
 ```
 
+
 ---
 
-## 8. Key Decisions and Trade-offs
+## 9. Key Decisions and Trade-offs
 
-### 8.1 Default Opt-In vs Opt-Out
+### 9.1 Default Opt-In vs Opt-Out
 
 **Decision:** Implement Default Opt-In (all employees assumed attending unless they opt out)
 
@@ -991,7 +1087,7 @@ App
 
 ---
 
-### 8.2 Eager Record Creation (Daily Cron) vs Lazy Creation (On-Demand)
+### 9.2 Eager Record Creation (Daily Cron) vs Lazy Creation (On-Demand)
 
 **Decision:** Implement Eager Record Creation with daily cron job at 9 PM
 
@@ -1016,7 +1112,7 @@ App
 
 ---
 
-### 8.3 7-Day Window vs Longer Planning Horizon
+### 9.3 7-Day Window vs Longer Planning Horizon
 
 **Decision:** Limit planning window to tomorrow through next 6 days (7 days total, excluding today)
 
@@ -1037,7 +1133,7 @@ App
 
 ---
 
-### 8.4 Single Role per User vs Combined Roles
+### 9.4 Single Role per User vs Combined Roles
 
 **Decision:** Enforce single role per user (no user can be both LEAD and ADMIN)
 
@@ -1062,7 +1158,7 @@ App
 ---
 
 
-### 8.5 Notification Architecture (Future-Ready)
+### 9.5 Notification Architecture (Future-Ready)
 
 **Decision:** Add notification metadata fields now (`lastModifiedBy`, `notificationSent`) but implement notification logic in Iteration 2
 
@@ -1079,9 +1175,9 @@ App
 
 ---
 
-## 9. Security and Access Control
+## 10. Security and Access Control
 
-### 9.1 Authentication
+### 10.1 Authentication
 
 **JWT Cookie-Based Authentication:**
 - **Token Generation**: JWT signed with secret key (HS256 algorithm)
@@ -1105,7 +1201,7 @@ App
 - Login endpoint limited to 5 attempts per 15 minutes per IP
 - Prevents brute force attacks
 
-### 9.2 Password Security
+### 10.2 Password Security
 
 **Hashing Strategy:**
 - **Algorithm**: bcrypt with salt rounds = 10
@@ -1129,7 +1225,7 @@ App
 - Minimum length: 8 characters (enforced at frontend)
 - No complexity requirements for iteration 1 (improve UX)
 
-### 9.3 Authorization (Role-Based Access Control)
+### 10.3 Authorization (Role-Based Access Control)
 
 **Middleware Stack:**
 1. **Authentication Middleware**: Validates JWT, extracts user claims
@@ -1160,7 +1256,7 @@ Client → authenticate() → requireRole(['LEAD', 'ADMIN']) → requireTeamAcce
 - **ADMIN**: Global scope (all employees, schedule management)
 - **LOGISTICS**: Read-only (headcount reports)
 
-### 9.4 Input Validation
+### 10.4 Input Validation
 
 **Validation Strategy:**
 - **Library**: express-validator
@@ -1182,7 +1278,7 @@ Client → authenticate() → requireRole(['LEAD', 'ADMIN']) → requireTeamAcce
 - Type-safe query builder prevents injection
 
 
-### 9.5 Data Privacy
+### 10.5 Data Privacy
 
 **Sensitive Data Handling:**
 - **Passwords**: Never logged, never transmitted in responses
@@ -1194,7 +1290,7 @@ Client → authenticate() → requireRole(['LEAD', 'ADMIN']) → requireTeamAcce
 - **Timestamps**: createdAt, updatedAt on all tables
 - **Future enhancement**: Comprehensive audit log table for compliance
 
-### 9.6 Production Security Checklist
+### 10.6 Production Security Checklist
 
 **Environment Variables:**
 - `JWT_SECRET`: Strong random secret (>32 characters)
@@ -1211,9 +1307,9 @@ Client → authenticate() → requireRole(['LEAD', 'ADMIN']) → requireTeamAcce
 
 ---
 
-## 10. Testing Plan
+## 11. Testing Plan
 
-### 10.1 Unit Testing
+### 11.1 Unit Testing
 
 **Scope:** Individual functions and utilities in isolation
 
@@ -1267,7 +1363,7 @@ describe('isDateInValidWindow', () => {
 });
 ```
 
-### 10.2 Integration Testing
+### 11.2 Integration Testing
 
 **Scope:** API endpoints with database interactions
 
@@ -1357,7 +1453,7 @@ describe('POST /api/meals/my-record', () => {
 });
 ```
 
-### 10.3 Manual Testing
+### 11.3 Manual Testing
 
 #### A. Employee Checklist
 
@@ -1465,9 +1561,43 @@ describe('POST /api/meals/my-record', () => {
 - ☐ Headcount excludes inactive and deleted users.
 
 
-## 11. Operations
+#### G. Auditability, WFH Indicators & Occasion Badge
 
-### 11.1 Deployment Architecture
+**Auditability Columns (FR16)**
+- ☐ Daily Participation table shows "Last Modified By" column for all rows
+- ☐ Rows edited by a Team Lead show that Lead's name (not null, not "system")
+- ☐ Rows edited by Admin show Admin's name
+- ☐ Rows created by cron job show null / "—" in "Last Modified By"
+- ☐ "Modified At" column shows correct timestamp for each row
+- ☐ After a proxy edit, "Last Modified By" and "Modified At" update correctly in the table
+
+**Occasion Badge on Headcount Tab (FR17)**
+- ☐ When no MealSchedule exists for selected date, no occasion badge is shown
+- ☐ When MealSchedule exists but occasionName is null, no badge is shown
+- ☐ When MealSchedule has occasionName set, badge displays correctly with the occasion name
+- ☐ Badge disappears if the MealSchedule is deleted for that date
+
+**WFH Over-Limit Indicators (FR18)**
+- ☐ "WFH Taken" column in Daily Participation table shows correct monthly WFH count per employee
+- ☐ Employees with WFH count ≤ 5 show count in normal text
+- ☐ Employees with WFH count > 5 show count highlighted in red
+- ☐ "WFH Limit Exceeded" summary card shows correct count of over-limit employees
+- ☐ "Total Extra WFH Days" summary card shows correct total of excess days
+- ☐ Summary cards update if date is changed (WFH count is per current month, not per selected date)
+
+**WFH Over-Limit Filter (FR19)**
+- ☐ "Show Over-Limit Only" filter button is visible above the table
+- ☐ Clicking the filter shows only employees with WFH count > 5
+- ☐ Clicking the filter again clears it and shows all employees
+- ☐ Filter button has a visible active state when engaged
+- ☐ Filter works correctly when combined with date changes
+- ☐ No additional API call is made when toggling the filter (client-side filtering)
+
+
+
+## 12. Operations
+
+### 12.1 Deployment Architecture
 
 **Hosting Environment:**
 - **Backend**: cloud run / Vercel / Railway / Render (Node.js hosting)
@@ -1479,7 +1609,7 @@ describe('POST /api/meals/my-record', () => {
 - **Staging**: Deployed backend + postgres staging database (separate instance)
 - **Production**: Deployed backend + postgres production database
 
-### 11.2 Environment Variables
+### 12.2 Environment Variables
 
 **Backend (.env):**
 ```
@@ -1496,7 +1626,7 @@ VITE_API_URL=https://api.mhp.company.com
 VITE_ENV=production
 ```
 
-### 11.3 Database Management
+### 12.3 Database Management
 
 **Schema Updates:**
 1. Update `schema.prisma` in development
@@ -1510,7 +1640,7 @@ VITE_ENV=production
 - **Inactive Users**: Soft delete by setting status = INACTIVE (preserve historical data)
 
 
-### 11.4 Cron Job Scheduling
+### 12.4 Cron Job Scheduling
 
 **Production Setup:**
 - **In-Process**: node-cron runs inside backend process (simple, no external scheduler)
@@ -1531,7 +1661,7 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 - If cron fails, manual fallback: Admin can trigger "Create Records" button
 - Idempotent design: Re-running cron is safe (skip duplicates)
 
-### 11.5 Disaster Recovery
+### 12.5 Disaster Recovery
 
 **Scenarios and Plans:**
 
@@ -1548,7 +1678,7 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 - Admin accidentally deletes MealSchedule: Restore from database backup
 - Employee accidentally opts out: Team Lead can correct via proxy edit
 
-### 11.7 Maintenance Windows
+### 12.6 Maintenance Windows
 
 **Scheduled Maintenance:**
 - **Frequency**: Monthly once
@@ -1566,9 +1696,9 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 
 ---
 
-## 12. Risks, Assumptions, and Open Questions
+## 13. Risks, Assumptions, and Open Questions
 
-### 12.1 Risks
+### 13.1 Risks
 
 **R1: Cron Job Failure**
 - **Description**: Daily cron job fails to create records, employees have nothing to edit
@@ -1608,7 +1738,7 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
   - Audit log to detect suspicious activity
   - Rate limiting on login endpoint
 
-### 12.2 Assumptions
+### 13.2 Assumptions
 
 **A1: Employee Internet Access**
 - **Assumption**: All employees have reliable internet access during work hours
@@ -1635,7 +1765,7 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 - **If false**: Would need attendance verification system
 
 
-### 12.3 Open Questions
+### 13.3 Open Questions
 
 **Q1: Notification Delivery Method**
 - **Question**: When implementing notifications (iteration 2), should we use email, SMS, or in-app notifications?
@@ -1670,19 +1800,33 @@ cron.schedule('0 0 * * *', createTomorrowRecords, {
 
 ---
 
-## 13. Success Metrics and KPIs
+## 14. Success Metrics and KPIs
 
-### 13.1 Launch Success Criteria
+### 14.1 Launch Success Criteria
 
 - **Adoption**: ≥80% of employees create accounts and use system daily
 - **Accuracy**: Headcount variance ≤1% compared to actual attendance
 - **Stability**: Zero critical bugs causing system downtime
 
-### 13.2 Ongoing Success Metrics
+### 14.2 Ongoing Success Metrics
 - Logistics team time savings: Target 90% time saving (from hours to minutes)
 - Headcount availability time: Target <5 minutes after 9 PM cutoff
 - Cron job success rate: Target >99%
 - Average time to update meals: Target <30 seconds per user
 - API uptime: Target ≥99% during business hours
+
+---
+
+
+## 15. Glossary
+
+**MHP**: Meal Headcount Planner.
+
+**Default-Opt-In**: The system logic where an employee is automatically counted for a meal unless they manually cancel.
+
+**Proxy Edit**: When an Admin or Team Lead updates a meal status on behalf of another employee.
+
+**WFH Over-limit**: When an employee exceeds the allowed 5 days of Work From Home per month.
+
 
 ---
