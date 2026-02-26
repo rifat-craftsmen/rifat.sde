@@ -119,6 +119,7 @@ export const updateUser = async (userId: number, data: UpdateUserData) => {
     }
 
     // If updating email, check for duplicates
+    // primary key is userId; email must be unique
     if (data.email && data.email !== existingUser.email) {
         const emailExists = await prisma.user.findUnique({
             where: { email: data.email },
@@ -144,7 +145,7 @@ export const updateUser = async (userId: number, data: UpdateUserData) => {
     const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: {
-            ...(data.name && { name: data.name }),
+            ...(data.name && { name: data.name }),   // if data.name exists, use it; else, ignore the field
             ...(data.email && { email: data.email }),
             ...(data.role && { role: data.role }),
             ...(data.teamId !== undefined && { teamId: data.teamId }),
@@ -187,7 +188,7 @@ export const deleteUser = async (userId: number) => {
     });
 
     if (team) {
-        throw new Error('Cannot delete user who is a team lead. Reassign team lead first.');
+        throw new Error('Cannot delete user who is a team lead. Remove user as team lead, Reassign someone else as team lead and then delete user.');
     }
 
     // Delete user (cascade will handle meal records)

@@ -14,7 +14,7 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is missing from .env");
 }
 
-// Local Docker Postgres setup with pg adapter (required for Prisma 7)
+// Local Docker Postgres setup. Prisma communicate with PostgreSQL via pg adapter 
 const pool = new pg.Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 
@@ -26,7 +26,7 @@ export const prisma = new PrismaClient({
   errorFormat: 'pretty',
 });
 
-// Graceful shutdown
+// Graceful shutdown: 'beforeExit' is a Node.js event listener that fires when the application has finished its work and the event loop is empty.
 process.on('beforeExit', async () => {
   await prisma.$disconnect();
   await pool.end();

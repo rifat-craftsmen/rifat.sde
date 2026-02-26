@@ -36,7 +36,7 @@ export const createUserController = async (req: AuthRequest, res: Response) => {
 
 export const getUserController = async (req: AuthRequest, res: Response) => {
     try {
-        const userIdParam = req.params.userId;
+        const userIdParam = req.params.userId; // if a query parameter is repeated in the request, the parser may group them into an array instead of a single value
         const idToParse = Array.isArray(userIdParam) ? userIdParam[0] : userIdParam;
         const userId = parseInt(idToParse);
 
