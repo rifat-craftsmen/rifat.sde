@@ -41,5 +41,5 @@ export const formatDateForDB = (date: Date): Date => {
 // Parse date string in YYYY-MM-DD format as UTC midnight
 export const parseDateString = (dateString: string): Date => {
   const [year, month, day] = dateString.split('-').map(Number);
-  return utcMidnight(year, month - 1, day);
+  return utcMidnight(year, month - 1, day);  // month is 0 to 11
 };

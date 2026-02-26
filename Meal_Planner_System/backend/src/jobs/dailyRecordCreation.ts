@@ -62,7 +62,7 @@ export const createTomorrowRecords = async () => {
         await prisma.mealRecord.update({
           where: { id: existingRecord.id },
           data: {
-            // If lunch is users choice (true/false), keep it; else if, lunch is null, use defaults.lunch 
+            // If lunch is users choice (true/false), keep it; else if lunch is null, use defaults.lunch 
             lunch: existingRecord.lunch ?? defaults.lunch,
             snacks: existingRecord.snacks ?? defaults.snacks,
             iftar: existingRecord.iftar ?? defaults.iftar,

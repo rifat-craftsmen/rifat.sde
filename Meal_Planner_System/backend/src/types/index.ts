@@ -31,7 +31,7 @@ export interface CreateScheduleData {
 }
 
 export interface BulkMealUpdateData {
-  userIds: number[];
+  userIds: number[];    // type[] and Array<type> are functionally same
   date: string;
   action: 'WFH_ALL' | 'ALL_OFF' | 'SET_ALL_MEALS' | 'UNSET_ALL_MEALS';
 }
@@ -86,3 +86,7 @@ export interface DailyParticipationData {
     };
   }>;
 }
+
+/*
+If payload has extra fields, TypeScript ignores the extra info. This is called "structural typing." As long as the required fields are present, it passes.
+*/

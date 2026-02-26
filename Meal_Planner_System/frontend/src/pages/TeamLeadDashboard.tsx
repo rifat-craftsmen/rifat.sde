@@ -100,7 +100,7 @@ const TeamLeadDashboard: React.FC = () => {
                     <div className="flex space-x-2 overflow-x-auto">
                         {([
                             { id: 'my-meals', label: 'My Meals', icon: '🍱' },
-                            { id: 'search-edit', label: 'Search & Edit', icon: '✏️' },
+                            { id: 'search-edit', label: 'Employee Proxy', icon: '✏️' },
                             { id: 'participation', label: 'Daily Participation', icon: '📋' },
                         ] as { id: TabType; label: string; icon: string }[]).map((tab) => (
                             <button
