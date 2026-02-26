@@ -1,10 +1,6 @@
 import { prisma } from '../config/prismaClient.js';
 import { formatDateForDB, parseDateString } from '../utils/dateHelpers';
-<<<<<<< HEAD
 import { CreateScheduleData, BulkMealUpdateData, CreateGlobalWFHData } from '../types';
-=======
-import { CreateScheduleData, BulkMealUpdateData } from '../types';
->>>>>>> 4079c4e (Add Bulk Action functionalities for Admin)
 
 // Get all teams
 export const getAllTeams = async () => {
