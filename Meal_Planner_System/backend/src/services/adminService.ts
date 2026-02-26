@@ -173,7 +173,7 @@ export const getDailyHeadcount = async (date: Date) => {
     const mealCount = [
       record.lunch, record.snacks, record.iftar,
       record.eventDinner, record.optionalDinner
-    ].filter(Boolean).length;
+    ].filter(Boolean).length;  // filters out all "falsy" values (false, null, undefined, 0, "")
 
     if (teamMap.has(teamId)) {
       const team = teamMap.get(teamId)!;
@@ -222,7 +222,7 @@ export const getDailyHeadcount = async (date: Date) => {
       date: { gte: monthStart, lte: monthEnd },
       workFromHome: true,
     },
-    _count: { id: true },
+    _count: { id: true },  //count the number of rows for each user
   });
   const wfhOverLimitCount = wfhMonthlyCounts.filter(r => r._count.id > 5).length;
   const totalExtraWFHDays = wfhMonthlyCounts
@@ -235,7 +235,7 @@ export const getDailyHeadcount = async (date: Date) => {
     teamBreakdown,
     workLocationSplit: { office: officeCount, wfh: wfhCount },
     overallTotal,
-    globalWFHActive: !!globalWFH,
+    globalWFHActive: !!globalWFH,  // converts globalWFH to boolean type before sending 
     globalWFHNote: globalWFH?.note || null,
     occasionName: mealSchedule?.occasionName || null,
     wfhOverLimitCount,
@@ -390,7 +390,7 @@ export const bulkUpdateMeals = async (
       break;
     case 'SET_ALL_MEALS':
       mealData = {
-        lunch: schedule?.lunchEnabled !== false,
+        lunch: schedule?.lunchEnabled !== false,   // if the value is explicitly made false or not
         snacks: schedule?.snacksEnabled !== false,
         iftar: schedule?.iftarEnabled ?? false,
         eventDinner: schedule?.eventDinnerEnabled ?? false,
