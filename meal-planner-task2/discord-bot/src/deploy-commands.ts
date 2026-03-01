@@ -3,7 +3,7 @@ import { REST, Routes } from 'discord.js'
 import { readdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import type { Command } from './index.js'
+import type { Command } from './lib/types.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const commandsDir = join(__dirname, 'commands')

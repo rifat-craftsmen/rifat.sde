@@ -1,18 +1,14 @@
 import 'dotenv/config'
 import { Client, GatewayIntentBits, Collection } from 'discord.js'
-import type { ChatInputCommandInteraction } from 'discord.js'
-// loadCommands wired in F0-7
-
-export interface Command {
-  data: { name: string; toJSON(): unknown }
-  execute: (interaction: ChatInputCommandInteraction) => Promise<void>
-}
+import { loadCommands } from './lib/commandLoader.js'
+import type { Command } from './lib/types.js'
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] })
 
 export const commands = new Collection<string, Command>()
 
-client.once('ready', (c) => {
+client.once('ready', async (c) => {
+  await loadCommands(commands)
   console.log(`Bot ready: ${c.user.tag} — ${commands.size} command(s) loaded`)
 })
 
