@@ -89,3 +89,69 @@ This document introduces a discord based Meal Headcount Planner system. Employee
 - `bulkUpdate`, `userIds` must be a non-empty array of strings.
 
 ---
+
+
+
+## Tech Stack
+
+| Layer | Choice | Rationale |
+|-------|--------|-----------|
+| Language | TypeScript / Node.js 20 | Type safety across bot and backend; single language reduces context-switching |
+| Bot library | `@discordjs/rest` + `discord-interactions` | REST client for command registration; `discord-interactions` for Ed25519 signature verification on the interactions endpoint |
+| Backend framework | Express.js | Minimal overhead; reused unchanged between local dev and Lambda |
+| Lambda adapter | `@vendia/serverless-express` | Wraps Express for Lambda with zero code changes to the app itself |
+| Deployment | AWS Lambda Function URL | No API Gateway cost (~$3.50/M requests) or configuration; direct HTTPS URL for a single known client |
+| Database | Amazon DynamoDB | Serverless, PAY_PER_REQUEST billing |
+| Local DB | DynamoDB Local via Docker | Identical API to AWS; no cloud credentials needed during development |
+| Build | esbuild | Bundles TypeScript + dependencies to a single ~3–5 MB file; `--external:@aws-sdk` excludes the SDK already present in Lambda runtime, reducing upload from ~150 MB to ~5 MB |
+
+---
+
+## Architecture Overview
+
+
+Discord uses the **Interactions Endpoint** model instead of a WebSocket gateway. When a user runs a slash command, Discord sends a POST to the configured Lambda Function URL. No always-on process is needed.
+
+```
+Discord User
+  │  slash command
+  ▼
+Discord
+  │  POST /discord/interactions  (Ed25519 signed)
+  ▼
+API Lambda
+  │  [1] verify Ed25519 signature        
+  │  [2] resolve discordId → userId       
+  │  [3] map Discord role IDs → app role 
+  │  [4] check command role requirement for authorization 
+  │  [5] execute command handler          
+  ▼
+Discord  (delivers interaction response to user)
+
+─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+
+EventBridge Scheduler  (9 PM BST)
+  │  invoke
+  ▼
+Cron Lambda
+  │  BatchWrite
+  ▼
+DynamoDB
+```
+
+
+
+
+Two independently deployable Lambda functions. No persistent bot process. 
+
+| Component | Runtime | Trigger |
+|-----------|---------|---------|
+| API Lambda | AWS Lambda, Node.js 20, arm64 | Lambda Function URL (HTTPS) — handles both API routes and Discord interactions endpoint |
+| Cron Lambda | AWS Lambda, Node.js 20, arm64 | EventBridge Scheduler, 9 PM BST daily |
+
+
+The Express app (`app.ts`) has no awareness of Lambda. `lambda.ts` wraps it with `@vendia/serverless-express` and exports the handler. The same `app.ts` is imported by `server.ts` for local `app.listen()` development. No code diverges between environments.
+
+
+---
+
