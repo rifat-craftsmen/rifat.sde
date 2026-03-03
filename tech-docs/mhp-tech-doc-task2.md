@@ -334,3 +334,54 @@ Each night at 9 PM, the system runs automatically. It fetches the list of all ac
 
 ---
 
+## User Management
+
+No API endpoints for user CRUD. The admin maintains two YAML files:
+
+- `scripts/data/users.yaml` — name, email, discordId, role, status, teamId
+- `scripts/data/teams.yaml` — teamId, name, leadId
+
+`npm run users:sync` diffs the YAML against DynamoDB and:
+- Creates or updates UserProfile items in `mealPlanner`
+- Maintains the `SYSTEM/ACTIVE_USERS` sentinel item (ADD active userIds, DELETE inactive)
+- Maintains `memberIds` StringSet on each `TeamItem` in `teams`
+- Deactivates users who are removed from the YAML (status → INACTIVE)
+
+---
+
+## Cron Job
+
+`cronLambda.ts` exports the Lambda handler. Triggered by EventBridge Scheduler at `cron(0 15 * * ? *)` UTC = 9 PM BST
+
+Logic:
+1. `GetItem` `mealPlanner` `PK=SYSTEM SK=ACTIVE_USERS` — get `memberIds` StringSet of all active users.
+2. `BatchGetItem` all `USER#{id} PROFILE` items for those userIds.
+3. `GetItem` `mealSchedules` `PK=tomorrow` — may return null.
+4. `Query` `globalWfhPeriods` `pk='WFH'` — get all WFH periods, filter for overlap with tomorrow.
+5. For each active user:
+   - If no `RECORD#{tomorrow}` exists: `PutItem` with schedule defaults; `workFromHome=true` if a global WFH period covers tomorrow.
+   - If a record exists: `UpdateItem` only setting meal fields whose current value is `null` — fields already set to `true` or `false` by the user are left unchanged.
+
+
+---
+
+
+### Definition of Done
+- `/health` returns `200 OK` from the local API server.
+- All 4 tables provisioned; `mealPlanner` has exactly 2 GSIs; `teams` and `globalWfhPeriods` have none.
+- Discord bot comes online and responds to slash commands with ephemeral replies.
+- curl tests against `localhost:3000` pass for each implemented feature.
+- DynamoDB items verified via AWS CLI after each write operation.
+
+---
+
+## Testing Approach
+
+No automated test suite this iteration. Testing is manual:
+
+- **Backend:** `curl` the interactions endpoint with a valid Ed25519-signed body and send a raw JSON interaction payload with the correct `type`, `member`, and `data` fields.
+- **DynamoDB:** `aws dynamodb` CLI commands against `--endpoint-url http://localhost:8000` to inspect item state after each operation.
+- **Discord commands:** Run `npm run deploy` in `discord-bot/` once to register slash commands, then invoke them in the Discord server and verify ephemeral replies.  
+- **Cron:** `tsx src/jobs/dailyRecordCreation.ts` directly, then verify tomorrow's records appear in DynamoDB.
+
+---
