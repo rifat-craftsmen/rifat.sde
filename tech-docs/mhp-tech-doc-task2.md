@@ -155,3 +155,80 @@ The Express app (`app.ts`) has no awareness of Lambda. `lambda.ts` wraps it with
 
 ---
 
+
+## Database Design
+
+Four DynamoDB tables. **2 GSIs total** — both on `mealPlanner`.
+
+### mealPlanner (3 item types)
+
+**UserProfile** — `PK: USER#{userId}` · `SK: PROFILE`
+- `userId`, `name`, `email`, `discordId`, `role`, `status`
+- `teamId`, `teamName` (denormalized from teams)
+- `wfhCount`, `wfhMonth` (monthly WFH counter, resets each month)
+- `gsi1pk: discordId` → discordId-index
+
+**MealRecord** — `PK: USER#{userId}` · `SK: RECORD#{YYYY-MM-DD}`
+- `lunch`, `snacks`, `iftar`, `eventDinner`, `optionalDinner` (`boolean | null`)
+- `workFromHome` (`boolean`)
+- `teamId`, `teamName` (denormalized for headcount grouping)
+- `lastModifiedBy`
+- `gsi2pk: RECORD#{date}` → date-records-index
+
+**Active User List** — `PK: SYSTEM` · `SK: ACTIVE_USERS`
+- `memberIds: StringSet` — all active userIds; read by cron each night to avoid a full table scan
+
+**GSIs**
+
+| Index | PK | SK |
+|-------|----|----|
+| `discordId-index` | `gsi1pk` (discordId) | `SK` |
+| `date-records-index` | `gsi2pk` (RECORD#{date}) | `PK` |
+
+### mealSchedules
+
+`PK: date (YYYY-MM-DD)`
+- `lunchEnabled`, `snacksEnabled`, `iftarEnabled`, `eventDinnerEnabled`, `optionalDinnerEnabled`
+- `occasionName` (optional), `createdBy`
+
+### teams
+
+`PK: teamId`
+- `name`, `leadId`
+- `memberIds: StringSet` (active member userIds)
+
+### globalWfhPeriods
+
+`PK: 'WFH'` · `SK: id (UUID)` — Query PK='WFH' returns all periods in one call; no GSI needed.
+- `dateFrom`, `dateTo` (YYYY-MM-DD)
+- `note` (optional), `createdBy`
+
+### Access Patterns
+
+| Pattern | Operation |
+|---------|-----------|
+| **mealPlanner** | |
+| Auth: discordId → userId | Query `discordId-index` (`gsi1pk=discordId`, `SK=PROFILE`) |
+| Get user profile | GetItem `PK=USER#{userId}`, `SK=PROFILE` |
+| Get user's single meal record | GetItem `PK=USER#{userId}`, `SK=RECORD#{date}` |
+| User's 7-day records | Query `PK=USER#{userId}`, SK BETWEEN `RECORD#{today}` AND `RECORD#{+6d}` |
+| Upsert meal record | PutItem `PK=USER#{userId}`, `SK=RECORD#{date}` |
+| Update WFH counter on profile | UpdateItem `PK=USER#{userId}`, `SK=PROFILE` ADD `wfhCount` |
+| All records for a date (headcount) | Query `date-records-index` (`gsi2pk=RECORD#{date}`) |
+| All active users (cron) | GetItem `PK=SYSTEM`, `SK=ACTIVE_USERS` → BatchGetItem profiles |
+| **mealSchedules** | |
+| Create schedule | PutItem `PK=date` |
+| Get schedule for a date | GetItem `PK=date` |
+| Delete schedule | DeleteItem `PK=date` |
+| List upcoming schedules | Scan with filter `date ≥ today` *(low volume — at most ~30 items ever exist)* |
+| **teams** | |
+| Get team + member list | GetItem `PK=teamId` |
+| Team member profiles | GetItem `teams PK=teamId` → memberIds → BatchGetItem profiles |
+| Update team membership | UpdateItem `PK=teamId` ADD/DELETE `memberIds` |
+| **globalWfhPeriods** | |
+| List all WFH periods | Query `PK='WFH'` |
+| Create WFH period | PutItem `PK='WFH'`, `SK={uuid}` |
+| Delete WFH period | DeleteItem `PK='WFH'`, `SK={uuid}` |
+
+---
+
