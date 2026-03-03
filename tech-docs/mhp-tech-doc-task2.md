@@ -232,3 +232,37 @@ Four DynamoDB tables. **2 GSIs total** — both on `mealPlanner`.
 
 ---
 
+
+## Authentication & Authorization
+
+Membership in the organization's Discord server is the identity boundary. No JWT, no session, no login endpoint is used. 
+
+### Authentication — Ed25519 Signature Verification
+
+Every interaction request from Discord is signed using the application's Ed25519 private key. The `discordVerify` middleware validates this signature against the application's `DISCORD_PUBLIC_KEY` before any other processing occurs. Requests with an invalid or missing signature are rejected with `401`. This is Discord's required security mechanism for interactions endpoints — Discord itself deactivates endpoints that fail to validate signatures correctly.
+
+### Identity Resolution
+
+The interaction payload includes `interaction.member.user.id`, which is the invoking user's Discord snowflake ID. The `discordAuth` middleware queries the `discordId-index` GSI to resolve this snowflake to the internal `userId` and `teamId`, and attaches them to `req.user`. If no matching user is found in DynamoDB, the request is rejected.
+
+### Role Resolution
+
+The interaction payload includes `interaction.member.roles`, an array of Discord role ID snowflakes assigned to the invoking user. The backend maps these IDs to application roles using environment variables configured at deployment time:
+
+| Env var | App Role | Assigned capabilities |
+|---------|----------|-----------------------|
+| `DISCORD_ROLE_ADMIN` | `ADMIN` | All commands |
+| `DISCORD_ROLE_LEAD` | `LEAD` | Team views, employee record overrides, bulk updates (own team only) |
+| `DISCORD_ROLE_LOGISTICS` | `LOGISTICS` | Headcount and participation views |
+| `DISCORD_ROLE_EMPLOYEE` | `EMPLOYEE` | Own schedule and meal updates only |
+
+If a user holds multiple qualifying roles, the highest-privilege role takes precedence (ADMIN > LEAD > LOGISTICS > EMPLOYEE). The resolved role is attached to `req.user.role`.
+
+### Authorization
+
+The `requireRole` middleware compares `req.user.role` against the set of roles permitted for the command being executed. Requests from users with insufficient role are rejected with `403`.
+
+Team Lead scope is enforced at the service layer in addition to the role check: a Lead's operations (participation view, record overrides, bulk updates) are restricted to users whose `teamId` matches `req.user.teamId`. A Lead cannot act on members of another team even if they hold the correct role.
+
+---
+
