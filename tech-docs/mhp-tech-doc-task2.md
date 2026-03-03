@@ -266,3 +266,71 @@ Team Lead scope is enforced at the service layer in addition to the role check: 
 
 ---
 
+
+## Discord Commands
+
+| Command | Role | Visibility | Description |
+|---------|------|------------|-------------|
+| `/my-schedule` | All | Ephemeral | View 7-day meal schedule and current choices |
+| `/create-meal` | All | Ephemeral | Create meal choices and WFH for a date |
+| `/update-meal` | All | Ephemeral | Update meal choices and WFH for a date |
+| `/create-schedule` | ADMIN | Public | Set meal options for a date |
+| `/list-schedules` | ADMIN | Ephemeral | View upcoming schedules |
+| `/delete-schedule` | ADMIN | Ephemeral | Remove a date's schedule |
+| `/set-wfh-period` | ADMIN | Public | Create a company-wide WFH date range |
+| `/list-wfh-periods` | ADMIN | Ephemeral | View active WFH periods |
+| `/delete-wfh-period` | ADMIN | Ephemeral | Remove a WFH period |
+| `/headcount` | ADMIN, LOGISTICS | Public | Daily meal totals and team breakdown |
+| `/participation` | ADMIN, LEAD | Ephemeral | Per-employee meal detail for a date |
+| `/team-members` | LEAD | Ephemeral | View own team participation |
+| `/employee-schedule` | LEAD | Ephemeral | View a team member's 7-day schedule |
+| `/create-employee-meal` | ADMIN, LEAD | Ephemeral | Create an employee's record |
+| `/update-employee-meal` | ADMIN, LEAD | Ephemeral | Override an employee's record |
+| `/bulk-update` | ADMIN, LEAD | Ephemeral | Apply one action to all team members |
+
+Public responses (`/create-schedule`, `/set-wfh-period`, `/headcount`) post embeds visible to the channel. All others are ephemeral.
+
+---
+
+## User Flows
+
+### Employee
+
+**Viewing their schedule** — An employee runs `/my-schedule`. The bot identifies their Discord role and sends the request to the backend on their behalf. The backend confirms their identity, fetches their meal records for the next 7 days alongside the published schedules and any active WFH periods for those dates, and returns a personal schedule view as a private reply.
+
+**Creating a record manually** — An employee runs `/create-meal` for a date where they want to set meal choices. The backend creates the record with their specified values and responds privately.
+
+**Updating a meal record** — An employee runs `/update-meal` with a date and their choices (e.g. no lunch, working from home). The backend validates the date is within the editable window, saves the updated record, and adjusts their monthly WFH count if their work location changed. The employee receives a private confirmation.
+
+### Team Lead
+
+**Viewing their team** — A Lead runs `/team-members`. The backend verifies their role, retrieves the team's member list, fetches each member's profile, and returns a private summary showing each member's name, status, and WFH count for the month.
+
+**Viewing a member's schedule** — A Lead runs `/employee-schedule` for a specific team member. The backend confirms the member belongs to the Lead's team, then returns that member's 7-day schedule view privately.
+
+**Viewing daily participation** — A Lead runs `/participation` for a date. The backend returns each team member's meal selections and work location for that day as a private reply.
+
+**Overriding a member's record** — A Lead runs `/update-employee-meal` targeting a team member. The backend checks the member belongs to the Lead's team before saving the updated record, recording the Lead as the last modifier.
+
+**Bulk update** — A Lead runs `/bulk-update` with an action (e.g. mark all as WFH) for a date. The backend applies the action across every member of their team and responds privately with a confirmation.
+
+### Admin
+
+**Creating a schedule** — An Admin runs `/create-schedule` for a date, selecting which meal types are available and an optional occasion name. The record is saved and a public confirmation is posted to the channel.
+
+**Managing WFH periods** — An Admin runs `/set-wfh-period` with a date range and optional note. The period is saved and a public announcement is posted. Existing periods can be listed with `/list-wfh-periods` or removed with `/delete-wfh-period`.
+
+**Checking headcount** — An Admin or Logistics member runs `/headcount` for a date. The backend tallies all meal records for that day — total counts per meal type, a breakdown by team, and an office vs WFH split — and posts the result publicly to the channel.
+
+**Viewing full participation** — An Admin runs `/participation` for a date and receives a private per-employee breakdown across all teams, not scoped to a single team like the Lead view.
+
+### Nightly Automation
+
+Each night at 9 PM, the system runs automatically. It fetches the list of all active users and tomorrow's published schedule (if one exists). For each active user it checks whether a record for tomorrow already exists:
+
+- If no record exists, one is created using the schedule's meal settings. If a company-wide WFH period covers tomorrow, the record is marked as WFH.
+- If a record already exists (the employee submitted choices earlier), only fields that are still unset are filled in. Any choice the employee already confirmed is left untouched.
+
+
+---
+
