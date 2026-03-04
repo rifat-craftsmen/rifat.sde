@@ -2,3 +2,4 @@ node_modules/
 dist/
 .env
 scripts/.test-keypair.json
+data/shared-local-instance.db
