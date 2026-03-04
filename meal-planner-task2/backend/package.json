@@ -10,7 +10,9 @@
     "build:cron": "esbuild src/jobs/cronLambda.ts --bundle --platform=node --target=node18 --external:@aws-sdk --outfile=dist/cron.js",
     "build": "npm run build:api && npm run build:cron",
     "tables:create": "tsx scripts/createTables.ts",
-    "users:sync": "tsx scripts/syncUsers.ts"
+    "teams:sync": "tsx scripts/syncTeams.ts",
+    "users:sync": "tsx scripts/syncUsers.ts",
+    "sync": "npm run teams:sync && npm run users:sync"
   },
   "keywords": [],
   "author": "",
@@ -24,7 +26,8 @@
     "discord-interactions": "^3.4.0",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
-    "express-validator": "^7.3.1"
+    "express-validator": "^7.3.1",
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

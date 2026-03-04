@@ -1,0 +1,10 @@
+# Team definitions
+# leadId must match a userId in users.yaml
+
+- teamId: team-engineering
+  name: Engineering
+  leadId: usr-002
+
+- teamId: team-marketing
+  name: Marketing
+  leadId: usr-005
