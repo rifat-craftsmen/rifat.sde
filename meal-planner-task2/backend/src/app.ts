@@ -1,11 +1,17 @@
 import express, { Request, Response, NextFunction } from 'express'
 import cors from 'cors'
+import { discordRouter } from './routes/discordRoutes.js'
 
 export const app = express()
 
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
 }))
+
+// Discord interactions route must be mounted before express.json() because
+// Ed25519 signature verification requires the raw request body (Buffer).
+app.use('/discord', discordRouter)
+
 app.use(express.json())
 
 

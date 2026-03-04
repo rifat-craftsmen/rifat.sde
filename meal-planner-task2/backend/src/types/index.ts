@@ -8,10 +8,10 @@ export type BulkAction = 'WFH_ALL' | 'ALL_OFF' | 'SET_ALL_MEALS' | 'UNSET_ALL_ME
 
 export interface AuthRequest extends Request {
   user?: {
-    userId:      string
-    discordId:   string
-    discordRole: Role
-    teamId?:     string
+    userId:    string
+    discordId: string
+    role:      Role
+    teamId?:   string
   }
 }
 
@@ -30,10 +30,8 @@ export interface UserItem {
   teamName?: string        // denormalized from teams table
   wfhCount:  number        // atomic counter, reset each month
   wfhMonth:  string        // YYYY-MM — month the counter belongs to
-  // GSI keys
-  gsi1pk:    string        // discordId  → discordId-index
-  gsi2pk:    string        // status     → status-index
-  gsi3pk?:   string        // teamId     → team-index (only if teamId set)
+  // GSI key
+  gsi1pk:    string        // discordId → discordId-index
   createdAt: string
   updatedAt: string
 }
@@ -53,19 +51,18 @@ export interface MealRecordItem {
   teamId?:         string        // denormalized for headcount query
   teamName?:       string        // denormalized for headcount query
   // GSI key
-  gsi4pk:          string        // RECORD#{date} → date-records-index
+  gsi2pk:          string        // RECORD#{date} → date-records-index
   createdAt:       string
   updatedAt:       string
 }
 
 export interface TeamItem {
-  teamId:    string
-  name:      string
-  leadId:    string
-  // GSI key
-  gsi1pk:    string        // leadId → leadId-index
-  createdAt: string
-  updatedAt: string
+  teamId:     string
+  name:       string
+  leadId:     string
+  memberIds?: Set<string>  // StringSet of userId values
+  createdAt:  string
+  updatedAt:  string
 }
 
 export interface MealScheduleItem {
@@ -82,19 +79,25 @@ export interface MealScheduleItem {
 }
 
 export interface GlobalWfhPeriodItem {
-  id:        string
+  PK:        'WFH'         // constant partition key
+  SK:        string        // uuid — sort key
+  id:        string        // same as SK, kept for convenience
   dateFrom:  string        // YYYY-MM-DD
   dateTo:    string        // YYYY-MM-DD
   note?:     string
   createdBy: string        // userId
-  // GSI keys
-  gsi1pk:    'WFH'         // constant → list-index
-  gsi1sk:    string        // dateFrom → for sorted listing
   createdAt: string
   updatedAt: string
 }
 
-// ── Request payload shapes (from Discord bot) ────────────────────────────
+// Sentinel item that tracks all active user IDs (avoids full-table scan in cron)
+export interface SystemActiveUsersItem {
+  PK:        'SYSTEM'
+  SK:        'ACTIVE_USERS'
+  memberIds: Set<string>   // StringSet of userId values
+}
+
+// ── Request payload shapes (from Discord interactions) ────────────────────
 
 export interface MealUpdateData {
   date:            string

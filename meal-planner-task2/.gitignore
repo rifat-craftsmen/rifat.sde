@@ -2,5 +2,4 @@ data/
 node_modules/
 dist/
 .env
-CLAUDE.md
-PLAN.md
+scripts/.test-keypair.json

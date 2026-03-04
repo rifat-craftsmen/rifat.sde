@@ -1,18 +1,17 @@
 {
   "name": "meal-planner-task2-discord-bot",
   "version": "1.0.0",
-  "description": "Discord bot for the meal planner",
-  "main": "src/index.ts",
+  "description": "Discord slash command deployer for the meal planner",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
     "deploy-commands": "tsx src/deploy-commands.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "discord.js": "^14.0.0",
+    "@discordjs/rest": "^2.4.3",
+    "discord-api-types": "^0.37.119",
     "dotenv": "^17.2.4"
   },
   "devDependencies": {

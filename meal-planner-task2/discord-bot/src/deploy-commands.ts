@@ -1,32 +1,30 @@
 import 'dotenv/config'
-import { REST, Routes } from 'discord.js'
-import { readdirSync } from 'fs'
-import { join, dirname } from 'path'
-import { fileURLToPath } from 'url'
-import type { Command } from './lib/types.js'
+import { REST } from '@discordjs/rest'
+import { Routes } from 'discord-api-types/v10'
+import type { RESTPostAPIApplicationCommandsJSONBody } from 'discord-api-types/v10'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const commandsDir = join(__dirname, 'commands')
+/**
+ * Registers slash commands with the Discord API.
+ * Run with: npm run deploy-commands
+ *
+ * Commands are imported and added to this array as each feature is built.
+ * For global deployment, swap applicationGuildCommands → applicationCommands
+ * (global commands take up to 1 hour to propagate).
+ */
+const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
+  // TODO: import and add command definitions here (F2+)
+]
 
-// Collect toJSON() payloads from every command file
-const commandFiles = readdirSync(commandsDir).filter(f => f.endsWith('.ts') || f.endsWith('.js'))
-const body: unknown[] = []
+const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!)
 
-for (const file of commandFiles) {
-  const mod = await import(join(commandsDir, file)) as { default: Command }
-  body.push(mod.default.data.toJSON())
-}
-
-const rest = new REST().setToken(process.env.DISCORD_TOKEN!)
-
-console.log(`Deploying ${body.length} command(s) to guild ${process.env.DISCORD_GUILD_ID}...`)
+console.log(`Deploying ${commands.length} command(s) to guild ${process.env.DISCORD_GUILD_ID}...`)
 
 await rest.put(
   Routes.applicationGuildCommands(
     process.env.DISCORD_CLIENT_ID!,
     process.env.DISCORD_GUILD_ID!,
   ),
-  { body },
+  { body: commands },
 )
 
 console.log('Done.')
