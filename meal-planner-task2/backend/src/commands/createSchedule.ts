@@ -55,7 +55,6 @@ export async function handleCreateSchedule(req: AuthRequest, res: Response): Pro
     type: 4,
     data: {
       content: `Schedule created for **${date}**${extra}\nMeals enabled: ${meals}`,
-      flags: 64,
     },
   })
 }

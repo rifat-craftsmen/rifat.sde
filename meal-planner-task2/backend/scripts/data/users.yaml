@@ -15,17 +15,17 @@
 
 - userId: usr-002
   discordId: "222222222222222222"
-  name: Sarah Lead
+  name: Sarah 
   email: sarah@company.com
-  role: LEAD
+  role: EMPLOYEE
   status: ACTIVE
   teamId: team-engineering
 
 - userId: usr-003
   discordId: "333333333333333333"
-  name: Bob Employee
+  name: Bob 
   email: bob@company.com
-  role: EMPLOYEE
+  role: LEAD
   status: ACTIVE
   teamId: team-engineering
 
@@ -50,7 +50,7 @@
   name: Eve Logistics
   email: eve@company.com
   role: LOGISTICS
-  status: ACTIVE
+  status: INACTIVE
   teamId: null
 
 - userId: usr-007
@@ -58,7 +58,7 @@
   name: Frank Former
   email: frank@company.com
   role: EMPLOYEE
-  status: INACTIVE
+  status: ACTIVE
   teamId: team-marketing
 
 - userId: usr-008
