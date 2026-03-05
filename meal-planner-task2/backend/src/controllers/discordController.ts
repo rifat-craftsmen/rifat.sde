@@ -1,27 +1,32 @@
 import { Response } from 'express'
 import { AuthRequest } from '../types/index.js'
+import { handleCreateSchedule } from '../commands/createSchedule.js'
+import { handleListSchedules }  from '../commands/listSchedules.js'
+import { handleDeleteSchedule } from '../commands/deleteSchedule.js'
 
 /**
  * Entry point for all Discord slash commands.
  * Runs after discordVerify (signature checked, PING handled)
  * and discordAuth (req.user populated).
- *
- * Future features will add command-specific handlers imported here.
  */
-export const handleInteraction = (req: AuthRequest, res: Response): void => {
+export const handleInteraction = async (req: AuthRequest, res: Response): Promise<void> => {
   const { type, data } = req.body as { type: number; data?: { name?: string } }
 
   // APPLICATION_COMMAND (type 2)
   if (type === 2) {
-    const commandName = data?.name ?? 'unknown'
-    // TODO: dispatch to feature-specific command handlers (F2+)
-    res.json({
-      type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
-      data: {
-        content: `Command \`/${commandName}\` is not yet implemented.`,
-        flags: 64, // EPHEMERAL
-      },
-    })
+    try {
+      switch (data?.name) {
+        case 'create-schedule': await handleCreateSchedule(req, res); return
+        case 'list-schedules':  await handleListSchedules(req, res);  return
+        case 'delete-schedule': await handleDeleteSchedule(req, res); return
+        default:
+          res.json({ type: 4, data: { content: `Unknown command \`/${data?.name}\`.`, flags: 64 } })
+          return
+      }
+    } catch (err) {
+      console.error('Command handler error:', err)
+      res.json({ type: 4, data: { content: 'An internal error occurred. Please try again.', flags: 64 } })
+    }
     return
   }
 

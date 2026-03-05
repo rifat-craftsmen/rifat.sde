@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import { REST } from '@discordjs/rest'
-import { Routes } from 'discord-api-types/v10'
+import { Routes, ApplicationCommandOptionType } from 'discord-api-types/v10'
 import type { RESTPostAPIApplicationCommandsJSONBody } from 'discord-api-types/v10'
 
 /**
@@ -12,7 +12,71 @@ import type { RESTPostAPIApplicationCommandsJSONBody } from 'discord-api-types/v
  * (global commands take up to 1 hour to propagate).
  */
 const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
-  // TODO: import and add command definitions here (F2+)
+  // ── F2: Meal Schedule Management ──────────────────────────────────────────
+  {
+    name: 'create-schedule',
+    description: 'Create a meal schedule for a future date (Admin only)',
+    options: [
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format (must be tomorrow or later)',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'lunch_enabled',
+        description: 'Enable lunch for this date?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: true,
+      },
+      {
+        name: 'snacks_enabled',
+        description: 'Enable snacks for this date?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: true,
+      },
+      {
+        name: 'iftar_enabled',
+        description: 'Enable iftar for this date?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: true,
+      },
+      {
+        name: 'event_dinner_enabled',
+        description: 'Enable event dinner for this date?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: true,
+      },
+      {
+        name: 'optional_dinner_enabled',
+        description: 'Enable optional dinner for this date?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: true,
+      },
+      {
+        name: 'occasion_name',
+        description: 'Optional occasion name (e.g. "Team offsite")',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+    ],
+  },
+  {
+    name: 'list-schedules',
+    description: 'List all upcoming meal schedules',
+  },
+  {
+    name: 'delete-schedule',
+    description: 'Delete a meal schedule by date (Admin only)',
+    options: [
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+    ],
+  },
 ]
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!)

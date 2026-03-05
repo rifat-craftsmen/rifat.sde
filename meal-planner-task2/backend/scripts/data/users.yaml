@@ -60,3 +60,12 @@
   role: EMPLOYEE
   status: INACTIVE
   teamId: team-marketing
+
+- userId: usr-008
+  discordId: "1467732201599664230"
+  name: Rifat Ahmed
+  email: rifat@craftsmen.com
+  role: ADMIN
+  status: ACTIVE
+  teamId: null
+
