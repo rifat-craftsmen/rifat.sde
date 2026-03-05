@@ -12,8 +12,8 @@ export const dynamo = DynamoDBDocumentClient.from(raw, {
 })
 
 export const TABLES = {
-  MAIN:      process.env.DYNAMODB_TABLE_MAIN      || 'mealPlanner',
-  SCHEDULES: process.env.DYNAMODB_TABLE_SCHEDULES || 'mealSchedules',
-  TEAMS:     process.env.DYNAMODB_TABLE_TEAMS     || 'teams',
-  WFH:       process.env.DYNAMODB_TABLE_WFH       || 'globalWfhPeriods',
+  MAIN:      process.env.DYNAMODB_TABLE_MAIN      || 'trainee-2026-rifat-mealPlanner',
+  SCHEDULES: process.env.DYNAMODB_TABLE_SCHEDULES || 'trainee-2026-rifat-mealSchedules',
+  TEAMS:     process.env.DYNAMODB_TABLE_TEAMS     || 'trainee-2026-rifat-teams',
+  WFH:       process.env.DYNAMODB_TABLE_WFH       || 'trainee-2026-rifat-globalWfhPeriods',
 } as const

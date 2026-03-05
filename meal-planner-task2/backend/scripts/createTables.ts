@@ -15,10 +15,10 @@ const client = new DynamoDBClient(
 )
 
 
-const MAIN      = process.env.DYNAMODB_TABLE_MAIN      || 'mealPlanner'
-const SCHEDULES = process.env.DYNAMODB_TABLE_SCHEDULES || 'mealSchedules'
-const TEAMS     = process.env.DYNAMODB_TABLE_TEAMS     || 'teams'
-const WFH       = process.env.DYNAMODB_TABLE_WFH       || 'globalWfhPeriods'
+const MAIN      = process.env.DYNAMODB_TABLE_MAIN      || 'trainee-2026-rifat-mealPlanner'
+const SCHEDULES = process.env.DYNAMODB_TABLE_SCHEDULES || 'trainee-2026-rifat-mealSchedules'
+const TEAMS     = process.env.DYNAMODB_TABLE_TEAMS     || 'trainee-2026-rifat-teams'
+const WFH       = process.env.DYNAMODB_TABLE_WFH       || 'trainee-2026-rifat-globalWfhPeriods'
 
 async function createIfNotExists(params: CreateTableCommandInput) {
   try {
