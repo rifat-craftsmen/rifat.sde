@@ -12,6 +12,12 @@ import type { RESTPostAPIApplicationCommandsJSONBody } from 'discord-api-types/v
  * (global commands take up to 1 hour to propagate).
  */
 const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
+  // ── F3: Employee Schedule View ────────────────────────────────────────────
+  {
+    name: 'my-schedule',
+    description: 'View your 7-day meal schedule and current selections',
+  },
+
   // ── F2: Meal Schedule Management ──────────────────────────────────────────
   {
     name: 'create-schedule',

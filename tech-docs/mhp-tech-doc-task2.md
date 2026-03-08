@@ -63,9 +63,11 @@ This document introduces a discord based Meal Headcount Planner system. Employee
 **Admin**
 - Admins create a meal schedule for a date, specifying which meal types are enabled and an optional occasion name.
 - Admins view all upcoming meal schedules.
+- Admins update a meal schedule for a date.
 - Admins delete a meal schedule for a date.
 - Admins create a company-wide WFH period with a date range and optional note.
 - Admins view all active WFH periods.
+- Admins update a WFH period.
 - Admins delete a WFH period.
 - Admins view the daily headcount for a date: total meal counts, team-by-team breakdown, and office vs WFH split.
 - Admins view per-employee meal participation for a date across all teams.
@@ -102,7 +104,6 @@ This document introduces a discord based Meal Headcount Planner system. Employee
 | Lambda adapter | `@vendia/serverless-express` | Wraps Express for Lambda with zero code changes to the app itself |
 | Deployment | AWS Lambda Function URL | No API Gateway cost (~$3.50/M requests) or configuration; direct HTTPS URL for a single known client |
 | Database | Amazon DynamoDB | Serverless, PAY_PER_REQUEST billing |
-| Local DB | DynamoDB Local via Docker | Identical API to AWS; no cloud credentials needed during development |
 | Build | esbuild | Bundles TypeScript + dependencies to a single ~3–5 MB file; `--external:@aws-sdk` excludes the SDK already present in Lambda runtime, reducing upload from ~150 MB to ~5 MB |
 
 ---
@@ -121,7 +122,7 @@ Discord
   ▼
 API Lambda
   │  [1] verify Ed25519 signature        
-  │  [2] resolve discordId → userId       
+  │  [2] fetch user profile by discordId     
   │  [3] map Discord role IDs → app role 
   │  [4] check command role requirement for authorization 
   │  [5] execute command handler          
@@ -158,67 +159,75 @@ The Express app (`app.ts`) has no awareness of Lambda. `lambda.ts` wraps it with
 
 ## Database Design
 
-Four DynamoDB tables. **2 GSIs total** — both on `mealPlanner`.
+Four DynamoDB tables. **1 GSI total** — on `mealPlanner`.
 
 ### mealPlanner (3 item types)
 
-**UserProfile** — `PK: USER#{userId}` · `SK: PROFILE`
-- `userId`, `name`, `email`, `discordId`, `role`, `status`
+**UserProfile** — `PK: {discordId}` · `SK: PROFILE`
+- `discordId`, `name`, `email`, `role`, `status`
 - `teamId`, `teamName` (denormalized from teams)
 - `wfhCount`, `wfhMonth` (monthly WFH counter, resets each month)
-- `gsi1pk: discordId` → discordId-index
+- `createdAt`, `updatedAt` (ISO 8601 timestamps)
 
-**MealRecord** — `PK: USER#{userId}` · `SK: RECORD#{YYYY-MM-DD}`
+**MealRecord** — `PK: {discordId}` · `SK: RECORD#{YYYY-MM-DD}`
 - `lunch`, `snacks`, `iftar`, `eventDinner`, `optionalDinner` (`boolean | null`)
 - `workFromHome` (`boolean`)
 - `teamId`, `teamName` (denormalized for headcount grouping)
-- `lastModifiedBy`
-- `gsi2pk: RECORD#{date}` → date-records-index
+- `lastModifiedBy` (discordId of modifier, or 'SYSTEM' for cron)
+- `gsi1pk: RECORD#{date}` → date-records-index
+- `createdAt`, `updatedAt` (ISO 8601 timestamps)
 
 **Active User List** — `PK: SYSTEM` · `SK: ACTIVE_USERS`
-- `memberIds: StringSet` — all active userIds; read by cron each night to avoid a full table scan
+- `memberIds: StringSet` — all active discordIds; read by cron each night to avoid a full table scan
+- `updatedAt` (ISO 8601 timestamp)
+
 
 **GSIs**
 
-| Index | PK | SK |
-|-------|----|----|
-| `discordId-index` | `gsi1pk` (discordId) | `SK` |
-| `date-records-index` | `gsi2pk` (RECORD#{date}) | `PK` |
+| Index | GSI PK | GSI SK | Purpose |
+|-------|--------|--------|---------|
+| `date-records-index` | `gsi1pk` = RECORD#{date} | `PK` = discordId | Query all meal records for a specific date |
+
 
 ### mealSchedules
 
 `PK: date (YYYY-MM-DD)`
 - `lunchEnabled`, `snacksEnabled`, `iftarEnabled`, `eventDinnerEnabled`, `optionalDinnerEnabled`
-- `occasionName` (optional), `createdBy`
+- `occasionName` (optional)
+- `createdAt`, `updatedAt` (ISO 8601 timestamp)
 
 ### teams
 
 `PK: teamId`
 - `name`, `leadId`
-- `memberIds: StringSet` (active member userIds)
+- `memberIds: StringSet` (active member discordIds)
+- `createdAt`, `updatedAt` (ISO 8601 timestamps)
+
 
 ### globalWfhPeriods
 
 `PK: 'WFH'` · `SK: id (UUID)` — Query PK='WFH' returns all periods in one call; no GSI needed.
 - `dateFrom`, `dateTo` (YYYY-MM-DD)
-- `note` (optional), `createdBy`
+- `note` (optional)
+- `createdAt`, `updatedAt` (ISO 8601 timestamp)
+
 
 ### Access Patterns
 
 | Pattern | Operation |
 |---------|-----------|
 | **mealPlanner** | |
-| Auth: discordId → userId | Query `discordId-index` (`gsi1pk=discordId`, `SK=PROFILE`) |
-| Get user profile | GetItem `PK=USER#{userId}`, `SK=PROFILE` |
-| Get user's single meal record | GetItem `PK=USER#{userId}`, `SK=RECORD#{date}` |
-| User's 7-day records | Query `PK=USER#{userId}`, SK BETWEEN `RECORD#{today}` AND `RECORD#{+6d}` |
-| Upsert meal record | PutItem `PK=USER#{userId}`, `SK=RECORD#{date}` |
-| Update WFH counter on profile | UpdateItem `PK=USER#{userId}`, `SK=PROFILE` ADD `wfhCount` |
-| All records for a date (headcount) | Query `date-records-index` (`gsi2pk=RECORD#{date}`) |
+| Get user profile | GetItem `PK={discordId}`, `SK=PROFILE` |
+| Get user's single meal record | GetItem `PK={discordId}`, `SK=RECORD#{date}` |
+| User's 7-day records | Query `PK={discordId}`, SK BETWEEN `RECORD#{today}` AND `RECORD#{+6d}` |
+| Insert meal record | PutItem `PK={discordId}`, `SK=RECORD#{date}` |
+| Update WFH counter on profile | UpdateItem `PK={discordId}`, `SK=PROFILE` ADD `wfhCount` |
+| All records for a date (headcount) | Query `date-records-index` (`gsi1pk=RECORD#{date}`) |
 | All active users (cron) | GetItem `PK=SYSTEM`, `SK=ACTIVE_USERS` → BatchGetItem profiles |
 | **mealSchedules** | |
 | Create schedule | PutItem `PK=date` |
 | Get schedule for a date | GetItem `PK=date` |
+| Update schedule | UpdateItem `PK=date` |
 | Delete schedule | DeleteItem `PK=date` |
 | List upcoming schedules | Scan with filter `date ≥ today` *(low volume — at most ~30 items ever exist)* |
 | **teams** | |
@@ -228,6 +237,7 @@ Four DynamoDB tables. **2 GSIs total** — both on `mealPlanner`.
 | **globalWfhPeriods** | |
 | List all WFH periods | Query `PK='WFH'` |
 | Create WFH period | PutItem `PK='WFH'`, `SK={uuid}` |
+| Update WFH period | UpdateItem `PK='WFH'`, `SK={uuid}` |
 | Delete WFH period | DeleteItem `PK='WFH'`, `SK={uuid}` |
 
 ---
@@ -243,7 +253,8 @@ Every interaction request from Discord is signed using the application's Ed25519
 
 ### Identity Resolution
 
-The interaction payload includes `interaction.member.user.id`, which is the invoking user's Discord snowflake ID. The `discordAuth` middleware queries the `discordId-index` GSI to resolve this snowflake to the internal `userId` and `teamId`, and attaches them to `req.user`. If no matching user is found in DynamoDB, the request is rejected.
+The interaction payload includes `interaction.member.user.id`, which is the invoking user's Discord snowflake ID. The `discordAuth` middleware uses this discordId to fetch the user profile (`PK={discordId}`, `SK=PROFILE`) and resolves `teamId`, attaching them to `req.user`. If no matching user is found in DynamoDB, the request is rejected.
+
 
 ### Role Resolution
 
@@ -276,9 +287,12 @@ Team Lead scope is enforced at the service layer in addition to the role check: 
 | `/update-meal` | All | Ephemeral | Update meal choices and WFH for a date |
 | `/create-schedule` | ADMIN | Public | Set meal options for a date |
 | `/list-schedules` | ADMIN | Ephemeral | View upcoming schedules |
+| `/update-schedule` | ADMIN | Ephemeral | Update meal options for a date |
 | `/delete-schedule` | ADMIN | Ephemeral | Remove a date's schedule |
 | `/set-wfh-period` | ADMIN | Public | Create a company-wide WFH date range |
 | `/list-wfh-periods` | ADMIN | Ephemeral | View active WFH periods |
+| `/update-wfh-period` | ADMIN | Ephemeral | Update a WFH period's date range or note |
+
 | `/delete-wfh-period` | ADMIN | Ephemeral | Remove a WFH period |
 | `/headcount` | ADMIN, LOGISTICS | Public | Daily meal totals and team breakdown |
 | `/participation` | ADMIN, LEAD | Ephemeral | Per-employee meal detail for a date |
@@ -354,8 +368,8 @@ No API endpoints for user CRUD. The admin maintains two YAML files:
 `cronLambda.ts` exports the Lambda handler. Triggered by EventBridge Scheduler at `cron(0 15 * * ? *)` UTC = 9 PM BST
 
 Logic:
-1. `GetItem` `mealPlanner` `PK=SYSTEM SK=ACTIVE_USERS` — get `memberIds` StringSet of all active users.
-2. `BatchGetItem` all `USER#{id} PROFILE` items for those userIds.
+1. `GetItem` `mealPlanner` `PK=SYSTEM SK=ACTIVE_USERS` — get `memberIds` StringSet of all active discordIds.
+2. `BatchGetItem` all `{discordId} PROFILE` items for those discordIds.
 3. `GetItem` `mealSchedules` `PK=tomorrow` — may return null.
 4. `Query` `globalWfhPeriods` `pk='WFH'` — get all WFH periods, filter for overlap with tomorrow.
 5. For each active user:
@@ -367,8 +381,8 @@ Logic:
 
 
 ### Definition of Done
-- `/health` returns `200 OK` from the local API server.
-- All 4 tables provisioned; `mealPlanner` has exactly 2 GSIs; `teams` and `globalWfhPeriods` have none.
+- `/health` returns `200 OK` from the Express server.
+- All 4 tables provisioned; `mealPlanner` has exactly 1 GSI; `teams` and `globalWfhPeriods` have none.
 - Discord bot comes online and responds to slash commands with ephemeral replies.
 - curl tests against `localhost:3000` pass for each implemented feature.
 - DynamoDB items verified via AWS CLI after each write operation.
@@ -380,7 +394,7 @@ Logic:
 No automated test suite this iteration. Testing is manual:
 
 - **Backend:** `curl` the interactions endpoint with a valid Ed25519-signed body and send a raw JSON interaction payload with the correct `type`, `member`, and `data` fields.
-- **DynamoDB:** `aws dynamodb` CLI commands against `--endpoint-url http://localhost:8000` to inspect item state after each operation.
+- **DynamoDB:** `aws dynamodb` CLI commands to inspect item state after each write operation.
 - **Discord commands:** Run `npm run deploy` in `discord-bot/` once to register slash commands, then invoke them in the Discord server and verify ephemeral replies.  
 - **Cron:** `tsx src/jobs/dailyRecordCreation.ts` directly, then verify tomorrow's records appear in DynamoDB.
 
