@@ -245,3 +245,87 @@ All sentinels live under `PK: SYSTEM`. They act as pre-built indexes to avoid fu
 
 ---
 
+
+### 6. WFH Period
+
+#### Access Patterns
+
+1. **List all WFH periods sorted by start date**
+   Query `PK: WFHPERIOD` — results naturally sorted by SK (`{dateFrom}#{uuid}`)
+
+2. **Create WFH period**
+   PutItem `PK: WFHPERIOD` `SK: {dateFrom}#{uuid}`
+
+3. **Update WFH period**
+   UpdateItem `PK: WFHPERIOD` `SK: {dateFrom}#{uuid}`
+
+4. **Delete WFH period**
+   DeleteItem `PK: WFHPERIOD` `SK: {dateFrom}#{uuid}`
+
+5. **Check if a date falls within any WFH period**
+   Query `PK: WFHPERIOD` → filter in application (`dateFrom <= date <= dateTo`)
+
+#### DB Schema
+
+**PK:** `WFHPERIOD`
+**SK:** `{dateFrom}#{uuid}` — e.g. `2026-03-10#a1b2c3d4`
+
+**Attributes:**
+- `id` (String) — UUID portion of SK
+- `dateFrom` (String) — YYYY-MM-DD start date
+- `dateTo` (String) — YYYY-MM-DD end date
+- `note` (String | null) — Optional description
+- `createdAt` (String) — ISO 8601 timestamp
+- `updatedAt` (String) — ISO 8601 timestamp
+
+**Schema Conventions:**
+- `WFHPERIOD` constant PK groups all periods under one partition
+- `{dateFrom}#{uuid}` SK makes list results naturally date-sorted — no GSI needed
+- UUID in SK suffix guarantees uniqueness for overlapping periods
+- Client receives full SK when listing; uses it for update/delete operations
+
+---
+
+### 7. Audit Log
+
+#### Access Patterns (write side — active now)
+
+1. **Write audit entry on every mutation**
+   PutItem `PK: AUDIT#{entityType}#{entityId}` `SK: {timestamp}#{uuid}`
+
+2. **Get all changes made to a specific entity**
+   Query `PK: AUDIT#{entityType}#{entityId}` (sorted chronologically by SK)
+
+
+#### DB Schema
+
+**PK:** `AUDIT#{entityType}#{entityId}`
+**SK:** `{timestamp}#{uuid}`
+
+**entityId format by entity type:**
+- `USER` → `{discordId}`
+- `MEAL_RECORD` → `{discordId}#{YYYY-MM-DD}` (e.g. `123456789012345678#2026-03-11`)
+- `SCHEDULE` → `{YYYY-MM-DD}`
+- `TEAM` → `{teamId}`
+- `WFH_PERIOD` → `{uuid}`
+
+**Attributes:**
+- `id` (String) — UUID of this audit entry
+- `timestamp` (String) — ISO 8601 timestamp
+- `actorDiscordId` (String) — Who triggered the change
+- `actorName` (String) — Denormalized name (historical snapshot)
+- `action` (String) — CREATE | UPDATE | DELETE
+- `entityType` (String) — USER | MEAL_RECORD | SCHEDULE | TEAM | WFH_PERIOD
+- `entityId` (String) — Identifier of the changed entity (see format above)
+- `targetDiscordId` (String | null) — For USER or MEAL_RECORD changes
+- `changes` (Map) — `{ fieldName: { old: value, new: value } }`
+- `metadata` (Map | null) — Optional context (command name, etc.)
+
+**Schema Conventions:**
+- `AUDIT#` prefix + entity type + entity ID groups all changes to one entity
+- `{timestamp}#{uuid}` SK ensures chronological ordering and uniqueness
+- Timestamp + UUID in SK: query descending for newest-first
+- GSI fields (`gsi1pk`, `gsi2pk`) are intentionally omitted — add when audit viewer command is built
+
+---
+
