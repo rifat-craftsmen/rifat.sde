@@ -11,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 interface TeamYaml {
   teamId: string
   name:   string
-  leadId: string
+  leadId: string  // discordId of team lead
 }
 
 function loadTeams(): TeamYaml[] {
@@ -21,14 +21,17 @@ function loadTeams(): TeamYaml[] {
 
 async function syncTeams() {
   const teams = loadTeams()
-  console.log(`\nSyncing ${teams.length} team(s) → ${TABLES.TEAMS}\n`)
+  console.log(`\nSyncing ${teams.length} team(s) → ${TABLES.MAIN}\n`)
+
+  const now     = new Date().toISOString()
+  const teamIds = teams.map(t => t.teamId)
 
   for (const team of teams) {
-    const now = new Date().toISOString()
-
     await dynamo.send(new PutCommand({
-      TableName: TABLES.TEAMS,
+      TableName: TABLES.MAIN,
       Item: {
+        PK:        `TEAM#${team.teamId}`,
+        SK:        'METADATA',
         teamId:    team.teamId,
         name:      team.name,
         leadId:    team.leadId,
@@ -38,8 +41,20 @@ async function syncTeams() {
       },
     }))
 
-    console.log(`  ✓ ${team.teamId}  (${team.name})`)
+    console.log(`  ✓ ${team.teamId}  (${team.name})  lead: ${team.leadId}`)
   }
+
+  // ── Upsert SYSTEM/ALL_TEAMS sentinel ──────────────────────────────────────
+  await dynamo.send(new PutCommand({
+    TableName: TABLES.MAIN,
+    Item: {
+      PK:        'SYSTEM',
+      SK:        'ALL_TEAMS',
+      teamIds:   new Set(teamIds),
+      updatedAt: now,
+    },
+  }))
+  console.log(`\n  ✓ SYSTEM/ALL_TEAMS updated  (${teamIds.length} teams)`)
 
   console.log('\nDone. Run npm run users:sync next to populate team members.\n')
 }

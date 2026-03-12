@@ -1,6 +1,6 @@
 import { Response } from 'express'
 import { AuthRequest } from '../types/index.js'
-import { deleteMealSchedule } from '../services/adminService.js'
+import { deleteMealScheduleWithAudit } from '../services/adminService.js'
 
 export async function handleDeleteSchedule(req: AuthRequest, res: Response): Promise<void> {
   if (req.user!.role !== 'ADMIN') {
@@ -16,6 +16,6 @@ export async function handleDeleteSchedule(req: AuthRequest, res: Response): Pro
     return
   }
 
-  await deleteMealSchedule(date)
+  await deleteMealScheduleWithAudit(date, req.user!.discordId)
   res.json({ type: 4, data: { content: `Schedule for **${date}** deleted.`, flags: 64 } })
 }

@@ -1,71 +1,61 @@
 # User definitions
-# userId:    stable identifier assigned by admin (never changes)
-# discordId: Discord snowflake ID (from Discord developer tools or right-click user)
+# discordId: Discord snowflake ID — primary identifier (right-click user in Discord → Copy ID)
 # role:      ADMIN | LEAD | LOGISTICS | EMPLOYEE
 # status:    ACTIVE | INACTIVE
 # teamId:    must match a teamId in teams.yaml, or null
 
-- userId: usr-001
-  discordId: "111111111111111111"
+- discordId: "111111111111111111"
   name: Alice Admin
   email: alice@company.com
   role: ADMIN
   status: ACTIVE
   teamId: null
 
-- userId: usr-002
-  discordId: "222222222222222222"
-  name: Sarah 
+- discordId: "222222222222222222"
+  name: Sarah
   email: sarah@company.com
   role: EMPLOYEE
   status: ACTIVE
   teamId: team-engineering
 
-- userId: usr-003
-  discordId: "333333333333333333"
-  name: Bob 
+- discordId: "333333333333333333"
+  name: Bob
   email: bob@company.com
   role: LEAD
   status: ACTIVE
   teamId: team-engineering
 
-- userId: usr-004
-  discordId: "444444444444444444"
+- discordId: "444444444444444444"
   name: Carol Employee
   email: carol@company.com
   role: EMPLOYEE
   status: ACTIVE
   teamId: team-engineering
 
-- userId: usr-005
-  discordId: "555555555555555555"
+- discordId: "555555555555555555"
   name: Dan Lead
   email: dan@company.com
   role: LEAD
   status: ACTIVE
   teamId: team-marketing
 
-- userId: usr-006
-  discordId: "666666666666666666"
+- discordId: "666666666666666666"
   name: Eve Logistics
   email: eve@company.com
   role: LOGISTICS
   status: INACTIVE
   teamId: null
 
-- userId: usr-007
-  discordId: "777777777777777777"
+- discordId: "777777777777777777"
   name: Frank Former
   email: frank@company.com
   role: EMPLOYEE
   status: ACTIVE
   teamId: team-marketing
 
-- userId: usr-008
-  discordId: "1467732201599664230"
+- discordId: "1467732201599664230"
   name: Rifat Ahmed
   email: rifat@craftsmen.com
   role: ADMIN
   status: ACTIVE
   teamId: null
-

@@ -3,12 +3,13 @@ import { Request } from 'express'
 export type Role = 'EMPLOYEE' | 'LEAD' | 'ADMIN' | 'LOGISTICS'
 export type UserStatus = 'ACTIVE' | 'INACTIVE'
 export type BulkAction = 'WFH_ALL' | 'ALL_OFF' | 'SET_ALL_MEALS' | 'UNSET_ALL_MEALS'
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE'
+export type AuditEntityType = 'USER' | 'MEAL_RECORD' | 'SCHEDULE' | 'TEAM' | 'WFH_PERIOD'
 
 // ── Attached to req by discordAuth middleware ─────────────────────────────
 
 export interface AuthRequest extends Request {
   user?: {
-    userId:    string
     discordId: string
     role:      Role
     teamId?:   string
@@ -18,83 +19,113 @@ export interface AuthRequest extends Request {
 // ── DynamoDB item shapes ──────────────────────────────────────────────────
 
 export interface UserItem {
-  PK:        string        // USER#{userId}
+  PK:        string        // USER#{discordId}
   SK:        'PROFILE'
-  userId:    string
+  discordId: string
   name:      string
   email:     string
-  discordId: string
   role:      Role
   status:    UserStatus
   teamId?:   string
-  teamName?: string        // denormalized from teams table
+  teamName?: string        // denormalized from team item
   wfhCount:  number        // atomic counter, reset each month
   wfhMonth:  string        // YYYY-MM — month the counter belongs to
-  // GSI key
-  gsi1pk:    string        // discordId → discordId-index
   createdAt: string
   updatedAt: string
 }
 
 export interface MealRecordItem {
-  PK:              string        // USER#{userId}
-  SK:              string        // RECORD#{YYYY-MM-DD}
-  userId:          string
-  date:            string        // YYYY-MM-DD
-  lunch:           boolean | null
-  snacks:          boolean | null
-  iftar:           boolean | null
-  eventDinner:     boolean | null
-  optionalDinner:  boolean | null
-  workFromHome:    boolean
-  lastModifiedBy?: string        // userId of whoever last changed this record
-  teamId?:         string        // denormalized for headcount query
-  teamName?:       string        // denormalized for headcount query
-  // GSI key
-  gsi2pk:          string        // RECORD#{date} → date-records-index
-  createdAt:       string
-  updatedAt:       string
-}
-
-export interface TeamItem {
-  teamId:     string
-  name:       string
-  leadId:     string
-  memberIds?: Set<string>  // StringSet of userId values
-  createdAt:  string
-  updatedAt:  string
+  PK:             string        // USER#{discordId}
+  SK:             string        // RECORD#{YYYY-MM-DD}
+  discordId:      string
+  date:           string        // YYYY-MM-DD
+  lunch:          boolean | null
+  snacks:         boolean | null
+  iftar:          boolean | null
+  eventDinner:    boolean | null
+  optionalDinner: boolean | null
+  workFromHome:   boolean
+  teamId?:        string        // denormalized for headcount grouping
+  teamName?:      string        // denormalized for headcount grouping
+  createdAt:      string
+  updatedAt:      string
 }
 
 export interface MealScheduleItem {
-  date:                  string  // YYYY-MM-DD (PK)
+  PK:                    string        // SCHEDULE#{date}
+  SK:                    'METADATA'
+  date:                  string        // YYYY-MM-DD
   lunchEnabled:          boolean
   snacksEnabled:         boolean
   iftarEnabled:          boolean
   eventDinnerEnabled:    boolean
   optionalDinnerEnabled: boolean
   occasionName?:         string
-  createdBy:             string  // userId
+  createdBy:             string        // discordId of admin who published
   createdAt:             string
   updatedAt:             string
 }
 
-export interface GlobalWfhPeriodItem {
-  PK:        'WFH'         // constant partition key
-  SK:        string        // uuid — sort key
-  id:        string        // same as SK, kept for convenience
-  dateFrom:  string        // YYYY-MM-DD
-  dateTo:    string        // YYYY-MM-DD
-  note?:     string
-  createdBy: string        // userId
+export interface TeamItem {
+  PK:        string        // TEAM#{teamId}
+  SK:        'METADATA'
+  teamId:    string
+  name:      string
+  leadId:    string        // discordId of team lead
+  memberIds?: Set<string>  // StringSet of discordIds
   createdAt: string
   updatedAt: string
 }
 
-// Sentinel item that tracks all active user IDs (avoids full-table scan in cron)
-export interface SystemActiveUsersItem {
+export interface WfhPeriodItem {
+  PK:        'WFHPERIOD'
+  SK:        string        // {dateFrom}#{uuid}
+  id:        string        // uuid portion only
+  dateFrom:  string        // YYYY-MM-DD
+  dateTo:    string        // YYYY-MM-DD
+  note?:     string
+  createdAt: string
+  updatedAt: string
+}
+
+// ── System sentinel items (PK: SYSTEM) ───────────────────────────────────
+
+export interface SystemSentinelItem {
   PK:        'SYSTEM'
+  SK:        'ACTIVE_USERS' | 'ALL_TEAMS' | 'UPCOMING_SCHEDULES'
+  updatedAt: string
+}
+
+export interface ActiveUsersItem extends SystemSentinelItem {
   SK:        'ACTIVE_USERS'
-  memberIds: Set<string>   // StringSet of userId values
+  memberIds: Set<string>   // StringSet of active discordIds
+}
+
+export interface AllTeamsItem extends SystemSentinelItem {
+  SK:      'ALL_TEAMS'
+  teamIds: Set<string>     // StringSet of all teamIds
+}
+
+export interface UpcomingSchedulesItem extends SystemSentinelItem {
+  SK:             'UPCOMING_SCHEDULES'
+  scheduleDates:  Set<string>  // StringSet of YYYY-MM-DD dates with a published schedule
+}
+
+// ── Audit log item ────────────────────────────────────────────────────────
+
+export interface AuditLogItem {
+  PK:               string           // AUDIT#{entityType}#{entityId}
+  SK:               string           // {timestamp}#{uuid}
+  id:               string           // uuid of this entry
+  timestamp:        string           // ISO 8601
+  actorDiscordId:   string
+  actorName:        string           // denormalized snapshot
+  action:           AuditAction
+  entityType:       AuditEntityType
+  entityId:         string           // see entityId format in design doc
+  targetDiscordId?: string           // for USER or MEAL_RECORD changes
+  changes?:         Record<string, { old: unknown; new: unknown }>
+  metadata?:        Record<string, unknown>
 }
 
 // ── Service return types ──────────────────────────────────────────────────
@@ -130,12 +161,12 @@ export interface CreateScheduleData {
 }
 
 export interface BulkMealUpdateData {
-  userIds: string[]
-  date:    string
-  action:  BulkAction
+  discordIds: string[]
+  date:       string
+  action:     BulkAction
 }
 
-export interface CreateGlobalWFHData {
+export interface CreateWfhPeriodData {
   dateFrom: string
   dateTo:   string
   note?:    string
@@ -166,7 +197,7 @@ export interface ScheduleDayView {
   } | null
 }
 
-export interface EnhancedHeadcountData {
+export interface HeadcountData {
   date:      string
   mealTotals: {
     lunch:          number
@@ -178,7 +209,7 @@ export interface EnhancedHeadcountData {
   teamBreakdown: Array<{
     teamId:         string
     teamName:       string
-    totalMeals:     number
+    totalMembers:   number
     lunch:          number
     snacks:         number
     iftar:          number
@@ -189,16 +220,14 @@ export interface EnhancedHeadcountData {
     office: number
     wfh:    number
   }
-  overallTotal:     number
-  globalWFHActive?: boolean
-  globalWFHNote?:   string | null
-  occasionName?:    string | null
+  overallTotal:  number
+  occasionName?: string | null
 }
 
 export interface DailyParticipationData {
   date:      string
   employees: Array<{
-    userId:        string
+    discordId:     string
     name:          string
     teamName:      string | null
     workFromHome:  boolean
@@ -210,6 +239,5 @@ export interface DailyParticipationData {
       eventDinner:    boolean | null
       optionalDinner: boolean | null
     }
-    lastModifiedBy: string | null
   }>
 }

@@ -1,10 +1,10 @@
 # Team definitions
-# leadId must match a userId in users.yaml
+# leadId must match a discordId in users.yaml
 
 - teamId: team-engineering
   name: Engineering
-  leadId: usr-002
+  leadId: "333333333333333333"
 
 - teamId: team-marketing
   name: Marketing
-  leadId: usr-005
+  leadId: "555555555555555555"
