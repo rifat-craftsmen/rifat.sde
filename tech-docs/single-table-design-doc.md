@@ -67,7 +67,7 @@
    BatchWriteItem with multiple `PK: USER#{discordId}` `SK: RECORD#{YYYY-MM-DD}`
 
 6. **Get team members' meal records for a specific date (work location view)**
-   GetItem `PK: TEAM#{teamId}` `SK: METADATA` → get memberIds
+   GetItem `PK: TEAM` `SK: {teamId}` → get memberIds
    BatchGetItem `PK: USER#{discordId}` `SK: RECORD#{date}` for each member
 
 #### DB Schema
@@ -100,28 +100,24 @@
 #### Access Patterns
 
 1. **Get schedule for a specific date**
-   GetItem `PK: SCHEDULE#{YYYY-MM-DD}` `SK: METADATA`
+   GetItem `PK: SCHEDULE` `SK: {YYYY-MM-DD}`
 
 2. **Create schedule for a date**
-   PutItem `PK: SCHEDULE#{YYYY-MM-DD}` `SK: METADATA`
-   Then UpdateItem `PK: SYSTEM` `SK: UPCOMING_SCHEDULES` ADD `scheduleDates :date`
+   PutItem `PK: SCHEDULE` `SK: {YYYY-MM-DD}`
 
 3. **Update schedule for a date**
-   UpdateItem `PK: SCHEDULE#{YYYY-MM-DD}` `SK: METADATA`
+   UpdateItem `PK: SCHEDULE` `SK: {YYYY-MM-DD}`
 
 4. **Delete schedule for a date**
-   DeleteItem `PK: SCHEDULE#{YYYY-MM-DD}` `SK: METADATA`
-   Then UpdateItem `PK: SYSTEM` `SK: UPCOMING_SCHEDULES` DELETE `scheduleDates :date`
+   DeleteItem `PK: SCHEDULE` `SK: {YYYY-MM-DD}`
 
 5. **List all upcoming schedules**
-   GetItem `PK: SYSTEM` `SK: UPCOMING_SCHEDULES` → get `scheduleDates` StringSet
-   BatchGetItem `PK: SCHEDULE#{date}` `SK: METADATA` for each date in set
-   Filter in application: `date >= today`
+   Query `PK: SCHEDULE` `SK >= today`
 
 #### DB Schema
 
-**PK:** `SCHEDULE#{YYYY-MM-DD}`
-**SK:** `METADATA`
+**PK:** `SCHEDULE`
+**SK:** `{YYYY-MM-DD}`
 
 **Attributes:**
 - `date` (String) — YYYY-MM-DD
@@ -136,17 +132,17 @@
 - `updatedAt` (String) — ISO 8601 timestamp
 
 **Schema Conventions:**
-- `SCHEDULE#` prefix + date as PK enables direct GetItem by date
-- `METADATA` is a constant SK for schedule configuration
+- Constant `SCHEDULE` PK groups all schedules in one partition — enables SK range query for listing
+- Date as SK makes listing upcoming schedules a single `Query SK >= today` with no sentinel needed
 - No weekends — schedules may only be created for Mon–Fri dates
 
 ---
 
-### 4. System Sentinels
+### 4. System Sentinel
 
-All sentinels live under `PK: SYSTEM`. They act as pre-built indexes to avoid full table scans.
+The single sentinel lives under `PK: SYSTEM`. It acts as a pre-built index to avoid a full table scan for the active user list.
 
-#### 4a. Active Users
+#### Active Users
 
 **Access Patterns:**
 
@@ -163,46 +159,8 @@ All sentinels live under `PK: SYSTEM`. They act as pre-built indexes to avoid fu
 - `memberIds` (StringSet) — Set of active user Discord IDs
 - `updatedAt` (String) — ISO 8601 timestamp
 
----
-
-#### 4b. All Teams
-
-**Access Patterns:**
-
-1. **Get all team IDs**
-   GetItem `PK: SYSTEM` `SK: ALL_TEAMS`
-   Then BatchGetItem `PK: TEAM#{teamId}` `SK: METADATA` for each
-
-2. **Add/remove team from list**
-   UpdateItem `PK: SYSTEM` `SK: ALL_TEAMS` ADD/DELETE `teamIds :teamId`
-
-**PK:** `SYSTEM`
-**SK:** `ALL_TEAMS`
-
-**Attributes:**
-- `teamIds` (StringSet) — Set of all team identifiers
-- `updatedAt` (String) — ISO 8601 timestamp
-
----
-
-#### 4c. Upcoming Schedules
-
-**Access Patterns:**
-
-1. **Get all published schedule dates**
-   GetItem `PK: SYSTEM` `SK: UPCOMING_SCHEDULES`
-   Then BatchGetItem `PK: SCHEDULE#{date}` `SK: METADATA` for each date
-   Filter: `date >= today`
-
-2. **Add/remove date from list (on schedule create/delete)**
-   UpdateItem `PK: SYSTEM` `SK: UPCOMING_SCHEDULES` ADD/DELETE `scheduleDates :date`
-
-**PK:** `SYSTEM`
-**SK:** `UPCOMING_SCHEDULES`
-
-**Attributes:**
-- `scheduleDates` (StringSet) — Set of dates (YYYY-MM-DD) with a published schedule
-- `updatedAt` (String) — ISO 8601 timestamp
+**Why sentinel and not a flat partition?**
+User profiles use `PK: USER#{discordId}` — they cannot be grouped under a single `PK: USER` partition without conflicting with the meal record range query pattern (`SK BETWEEN RECORD#...`). A flat partition for active users would also return N items on Query vs a single GetItem for the StringSet. 
 
 ---
 
@@ -211,24 +169,24 @@ All sentinels live under `PK: SYSTEM`. They act as pre-built indexes to avoid fu
 #### Access Patterns
 
 1. **Get team details and member list**
-   GetItem `PK: TEAM#{teamId}` `SK: METADATA`
+   GetItem `PK: TEAM` `SK: {teamId}`
 
 2. **Get all team member profiles**
-   GetItem `PK: TEAM#{teamId}` `SK: METADATA` → BatchGetItem `USER#{discordId}/PROFILE` for each member
+   GetItem `PK: TEAM` `SK: {teamId}` → BatchGetItem `PK: USER#{discordId}` `SK: PROFILE` for each member
 
 3. **Get all teams with details**
-   GetItem `PK: SYSTEM` `SK: ALL_TEAMS` → BatchGetItem `TEAM#{teamId}/METADATA` for each
+   Query `PK: TEAM` → returns all team items directly
 
 4. **Get all users grouped by team**
-   GetItem `PK: SYSTEM` `SK: ACTIVE_USERS` → BatchGetItem all `USER#{discordId}/PROFILE` → group by `teamId` in application
+   GetItem `PK: SYSTEM` `SK: ACTIVE_USERS` → BatchGetItem all `PK: USER#{discordId}` `SK: PROFILE` → group by `teamId` in application
 
 5. **Update team membership (add/remove members)**
-   UpdateItem `PK: TEAM#{teamId}` `SK: METADATA` ADD/DELETE `memberIds :discordId`
+   UpdateItem `PK: TEAM` `SK: {teamId}` ADD/DELETE `memberIds :discordId`
 
 #### DB Schema
 
-**PK:** `TEAM#{teamId}`
-**SK:** `METADATA`
+**PK:** `TEAM`
+**SK:** `{teamId}`
 
 **Attributes:**
 - `teamId` (String) — Unique team identifier
@@ -239,7 +197,7 @@ All sentinels live under `PK: SYSTEM`. They act as pre-built indexes to avoid fu
 - `updatedAt` (String) — ISO 8601 timestamp
 
 **Schema Conventions:**
-- `TEAM#` prefix identifies team partition
+- Constant `TEAM` PK groups all teams in one partition — enables `Query PK=TEAM` to list all teams without a sentinel
 - `memberIds` StringSet — sustainable up to ~15,000 members per team before 400KB item limit
 - Team lead's discordId used for authorization checks at command level
 
@@ -342,46 +300,49 @@ No GSIs are defined on this table.
 | Single entity lookup | GetItem by PK + SK |
 | User's meal records (7 weekdays) | Query by PK, SK range |
 | Headcount for a date | ACTIVE_USERS sentinel → BatchGetItem |
-| List all teams | ALL_TEAMS sentinel → BatchGetItem |
-| List upcoming schedules | UPCOMING_SCHEDULES sentinel → BatchGetItem |
+| List all teams | Query `PK=TEAM` |
+| List upcoming schedules | Query `PK=SCHEDULE SK >= today` |
 | WFH periods sorted by date | Query WFHPERIOD partition (dateFrom in SK) |
 | Team members' records | TEAM item memberIds → BatchGetItem |
 
 ### Sentinel Pattern
 
-Sentinel items in the `SYSTEM` partition act as pre-built indexes for collections that would otherwise require a full table scan or GSI.
+One sentinel item remains under the `SYSTEM` partition.
 
 | SK | Purpose |
 |---|---|
 | `ACTIVE_USERS` | All active user Discord IDs → used by cron and headcount |
-| `ALL_TEAMS` | All team IDs → used for listing teams |
-| `UPCOMING_SCHEDULES` | All published schedule dates → used for schedule listing |
 
-**Rule:** Every write that affects a sentinel (user activated, team created, schedule published) must also atomically update the relevant sentinel item.
 
-### Prefix Conventions
+**Rule:** Every write that affects the ACTIVE_USERS sentinel (user activated/deactivated) must also update the sentinel item.
 
-| Prefix | Partition |
+### Partition Key Conventions
+
+| PK | Contents |
 |---|---|
-| `USER#` | User profiles and meal records |
-| `RECORD#` | Meal record sort key |
-| `SCHEDULE#` | Meal schedule configuration |
-| `TEAM#` | Team configuration |
-| `WFHPERIOD` | Global WFH period entries |
-| `AUDIT#` | Audit log entries |
-| `SYSTEM` | System-wide sentinels and metadata |
+| `USER#{discordId}` | User profile + meal records for that user |
+| `SCHEDULE` | All meal schedule items (SK = date) |
+| `TEAM` | All team items (SK = teamId) |
+| `WFHPERIOD` | All WFH period entries |
+| `AUDIT#{entityType}#{entityId}` | Audit log entries for one entity |
+| `SYSTEM` | System-wide sentinel (ACTIVE_USERS) |
+
+### Sort Key Conventions
+
+| SK pattern | Used by |
+|---|---|
+| `PROFILE` | User profile item |
+| `RECORD#{date}` | Meal record — enables BETWEEN range query |
+| `{YYYY-MM-DD}` | Meal schedule — enables `SK >= today` range query |
+| `{teamId}` | Team item |
+| `{dateFrom}#{uuid}` | WFH period — date-sorted, no GSI |
+| `{timestamp}#{uuid}` | Audit log — chronological ordering |
 
 ### Denormalization Strategy
 
 - `teamId` and `teamName` stored on UserProfile and MealRecord — avoids lookup on common queries
 - Actor name stored on AuditLog entries — historical snapshot; doesn't change if user is renamed
 - Full mutation history is in AuditLog — no `lastModifiedBy` shortcut needed on individual items
-
-### Sort Key Design
-
-- `RECORD#{date}` on SK enables BETWEEN range queries for weekday windows
-- `{dateFrom}#{uuid}` on WFH Period SK enables date-sorted query with no GSI
-- `{timestamp}#{uuid}` on AuditLog SK enables chronological ordering and uniqueness
 
 
 ## Access Patterns Summary
@@ -405,44 +366,40 @@ Sentinel items in the `SYSTEM` partition act as pre-built indexes for collection
 | 6   | Create or update meal record for a user                | PutItem/UpdateItem `PK = USER#{discordId}` + `SK = RECORD#{YYYY-MM-DD}`                                                          |
 | 7   | Get all meal records for a specific date (headcount)   | GetItem `PK = SYSTEM` + `SK = ACTIVE_USERS` → BatchGetItem `PK = USER#{discordId}` + `SK = RECORD#{date}` for each active user |
 | 8   | Batch create meal records (nightly cron job)           | BatchWriteItem with multiple `PK = USER#{discordId}` + `SK = RECORD#{YYYY-MM-DD}`                                               |
-| 9   | Get team members' meal records for a specific date     | GetItem `PK = TEAM#{teamId}` + `SK = METADATA` → BatchGetItem `PK = USER#{discordId}` + `SK = RECORD#{date}` for each member   |
+| 9   | Get team members' meal records for a specific date     | GetItem `PK = TEAM` + `SK = {teamId}` → BatchGetItem `PK = USER#{discordId}` + `SK = RECORD#{date}` for each member            |
 
 ---
 
 ### Meal Schedule
 
-| #   | Pattern                        | Key Condition                                                                                                                                                                                |
-| :-- | :----------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 10  | Get schedule for a specific date | `PK = SCHEDULE#{YYYY-MM-DD}` + `SK = METADATA`                                                                                                                                               |
-| 11  | Create schedule for a date       | PutItem `PK = SCHEDULE#{YYYY-MM-DD}` + `SK = METADATA` → UpdateItem `PK = SYSTEM` + `SK = UPCOMING_SCHEDULES` ADD scheduleDates                                                             |
-| 12  | Update schedule for a date       | UpdateItem `PK = SCHEDULE#{YYYY-MM-DD}` + `SK = METADATA`                                                                                                                                    |
-| 13  | Delete schedule for a date       | DeleteItem `PK = SCHEDULE#{YYYY-MM-DD}` + `SK = METADATA` → UpdateItem `PK = SYSTEM` + `SK = UPCOMING_SCHEDULES` DELETE scheduleDates                                                       |
-| 14  | List all upcoming schedules      | GetItem `PK = SYSTEM` + `SK = UPCOMING_SCHEDULES` → BatchGetItem `PK = SCHEDULE#{date}` + `SK = METADATA` for each date → filter `date >= today` in app                                     |
+| #   | Pattern                          | Key Condition                                 |
+| :-- | :------------------------------- | :-------------------------------------------- |
+| 10  | Get schedule for a specific date | GetItem `PK = SCHEDULE` + `SK = {YYYY-MM-DD}` |
+| 11  | Create schedule for a date       | PutItem `PK = SCHEDULE` + `SK = {YYYY-MM-DD}` |
+| 12  | Update schedule for a date       | UpdateItem `PK = SCHEDULE` + `SK = {YYYY-MM-DD}` |
+| 13  | Delete schedule for a date       | DeleteItem `PK = SCHEDULE` + `SK = {YYYY-MM-DD}` |
+| 14  | List all upcoming schedules      | Query `PK = SCHEDULE` + `SK >= today`         |
 
 ---
 
-### System Sentinels
+### System Sentinel
 
-| #   | Pattern                                      | Key Condition                                                                                                |
-| :-- | :------------------------------------------- | :----------------------------------------------------------------------------------------------------------- |
-| 15  | Get all active Discord IDs (cron, headcount) | `PK = SYSTEM` + `SK = ACTIVE_USERS`                                                                          |
-| 16  | Add/remove user from active list             | UpdateItem `PK = SYSTEM` + `SK = ACTIVE_USERS` ADD/DELETE memberIds                                          |
-| 17  | Get all team IDs                             | `PK = SYSTEM` + `SK = ALL_TEAMS` → BatchGetItem `PK = TEAM#{teamId}` + `SK = METADATA` for each             |
-| 18  | Add/remove team from list                    | UpdateItem `PK = SYSTEM` + `SK = ALL_TEAMS` ADD/DELETE teamIds                                               |
-| 19  | Get all published schedule dates             | `PK = SYSTEM` + `SK = UPCOMING_SCHEDULES` → BatchGetItem `PK = SCHEDULE#{date}` + `SK = METADATA` for each  |
-| 20  | Add/remove date from schedule list           | UpdateItem `PK = SYSTEM` + `SK = UPCOMING_SCHEDULES` ADD/DELETE scheduleDates                                |
+| #   | Pattern                                      | Key Condition                                                            |
+| :-- | :------------------------------------------- | :----------------------------------------------------------------------- |
+| 15  | Get all active Discord IDs (cron, headcount) | GetItem `PK = SYSTEM` + `SK = ACTIVE_USERS`                              |
+| 16  | Add/remove user from active list             | UpdateItem `PK = SYSTEM` + `SK = ACTIVE_USERS` ADD/DELETE memberIds      |
 
 ---
 
 ### Team
 
-| #   | Pattern                              | Key Condition                                                                                                                                                |
-| :-- | :----------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 21  | Get team details and member list     | `PK = TEAM#{teamId}` + `SK = METADATA`                                                                                                                       |
-| 22  | Get all team member profiles         | GetItem `PK = TEAM#{teamId}` + `SK = METADATA` → BatchGetItem `PK = USER#{discordId}` + `SK = PROFILE` for each member                                      |
-| 23  | Get all teams with details           | GetItem `PK = SYSTEM` + `SK = ALL_TEAMS` → BatchGetItem `PK = TEAM#{teamId}` + `SK = METADATA` for each                                                     |
-| 24  | Get all users grouped by team        | GetItem `PK = SYSTEM` + `SK = ACTIVE_USERS` → BatchGetItem `PK = USER#{discordId}` + `SK = PROFILE` for all → group by teamId in app                        |
-| 25  | Update team membership               | UpdateItem `PK = TEAM#{teamId}` + `SK = METADATA` ADD/DELETE memberIds                                                                                       |
+| #   | Pattern                              | Key Condition                                                                                                                                  |
+| :-- | :----------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
+| 17  | Get team details and member list     | GetItem `PK = TEAM` + `SK = {teamId}`                                                                                                          |
+| 18  | Get all team member profiles         | GetItem `PK = TEAM` + `SK = {teamId}` → BatchGetItem `PK = USER#{discordId}` + `SK = PROFILE` for each member                                 |
+| 19  | Get all teams with details           | Query `PK = TEAM`                                                                                                                              |
+| 20  | Get all users grouped by team        | GetItem `PK = SYSTEM` + `SK = ACTIVE_USERS` → BatchGetItem `PK = USER#{discordId}` + `SK = PROFILE` for all → group by teamId in app          |
+| 21  | Update team membership               | UpdateItem `PK = TEAM` + `SK = {teamId}` ADD/DELETE memberIds                                                                                  |
 
 ---
 
@@ -450,11 +407,11 @@ Sentinel items in the `SYSTEM` partition act as pre-built indexes for collection
 
 | #   | Pattern                                      | Key Condition                                                                                    |
 | :-- | :------------------------------------------- | :----------------------------------------------------------------------------------------------- |
-| 26  | List all WFH periods sorted by start date    | Query `PK = WFHPERIOD` (sorted by SK: `{dateFrom}#{uuid}`)                                       |
-| 27  | Create WFH period                            | PutItem `PK = WFHPERIOD` + `SK = {dateFrom}#{uuid}`                                              |
-| 28  | Update WFH period                            | UpdateItem `PK = WFHPERIOD` + `SK = {dateFrom}#{uuid}`                                           |
-| 29  | Delete WFH period                            | DeleteItem `PK = WFHPERIOD` + `SK = {dateFrom}#{uuid}`                                           |
-| 30  | Check if a date falls within any WFH period  | Query `PK = WFHPERIOD` → filter in app (dateFrom <= date <= dateTo)                             |
+| 22  | List all WFH periods sorted by start date    | Query `PK = WFHPERIOD` (sorted by SK: `{dateFrom}#{uuid}`)                                       |
+| 23  | Create WFH period                            | PutItem `PK = WFHPERIOD` + `SK = {dateFrom}#{uuid}`                                              |
+| 24  | Update WFH period                            | UpdateItem `PK = WFHPERIOD` + `SK = {dateFrom}#{uuid}`                                           |
+| 25  | Delete WFH period                            | DeleteItem `PK = WFHPERIOD` + `SK = {dateFrom}#{uuid}`                                           |
+| 26  | Check if a date falls within any WFH period  | Query `PK = WFHPERIOD` → filter in app (dateFrom <= date <= dateTo)                             |
 
 ---
 
@@ -462,8 +419,7 @@ Sentinel items in the `SYSTEM` partition act as pre-built indexes for collection
 
 | #   | Pattern                                      | Key Condition                                                                                    |
 | :-- | :------------------------------------------- | :----------------------------------------------------------------------------------------------- |
-| 31  | Write audit entry on every mutation          | PutItem `PK = AUDIT#{entityType}#{entityId}` + `SK = {timestamp}#{uuid}`                         |
-| 32  | Get all changes made to a specific entity    | Query `PK = AUDIT#{entityType}#{entityId}` (sorted chronologically by SK)                        |
+| 27  | Write audit entry on every mutation          | PutItem `PK = AUDIT#{entityType}#{entityId}` + `SK = {timestamp}#{uuid}`                         |
+| 28  | Get all changes made to a specific entity    | Query `PK = AUDIT#{entityType}#{entityId}` (sorted chronologically by SK)                        |
 
 ---
-
