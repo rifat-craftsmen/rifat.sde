@@ -2,13 +2,10 @@ import { QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import {
   getTodayString,
-  toDateString,
-  parseDateString,
-  getDatesBetween,
+  getNextNWeekdays,
   isDateInPeriod,
 } from '../utils/dateHelpers.js'
-import { addDays } from 'date-fns'
-import type { MealRecordItem, MealScheduleItem, GlobalWfhPeriodItem, ScheduleDay } from '../types/index.js'
+import type { MealRecordItem, MealScheduleItem, WfhPeriodItem, ScheduleDay } from '../types/index.js'
 
 // Default schedule when no MealScheduleItem exists for a date
 const DEFAULT_SCHEDULE = {
@@ -20,45 +17,47 @@ const DEFAULT_SCHEDULE = {
 }
 
 /**
- * Fetch the 7-day meal schedule view for a user (today through today+6).
- * Today is included but locked for editing (shown as-is).
+ * Fetch the 7-weekday meal schedule view for a user (Mon–Fri, weekends excluded).
+ * Today is included but shown as-is (past records are read-only).
  */
-export async function getMySchedule(userId: string): Promise<ScheduleDay[]> {
-  const today = getTodayString()
-  const end   = toDateString(addDays(parseDateString(today), 6))
-  const dates = getDatesBetween(today, end)
+export async function getMySchedule(discordId: string): Promise<ScheduleDay[]> {
+  const today   = getTodayString()
+  const dates   = getNextNWeekdays(7)   // next 7 weekdays starting today
+  const endDate = dates[dates.length - 1]
 
-  // 1. Query user's meal records for the 7-day range
+  // 1. Query user's meal records for the weekday range
   const recordsResult = await dynamo.send(new QueryCommand({
     TableName: TABLES.MAIN,
     KeyConditionExpression: 'PK = :pk AND SK BETWEEN :start AND :end',
     ExpressionAttributeValues: {
-      ':pk':    `USER#${userId}`,
+      ':pk':    `USER#${discordId}`,
       ':start': `RECORD#${today}`,
-      ':end':   `RECORD#${end}`,
+      ':end':   `RECORD#${endDate}`,
     },
   }))
   const records = (recordsResult.Items ?? []) as MealRecordItem[]
   const recordsByDate = Object.fromEntries(records.map(r => [r.date, r]))
 
-  // 2. BatchGet published schedules for all 7 dates
+  // 2. BatchGet published schedules for all weekday dates
   const schedulesResult = await dynamo.send(new BatchGetCommand({
     RequestItems: {
-      [TABLES.SCHEDULES]: { Keys: dates.map(d => ({ date: d })) },
+      [TABLES.MAIN]: {
+        Keys: dates.map(d => ({ PK: `SCHEDULE#${d}`, SK: 'METADATA' })),
+      },
     },
   }))
-  const scheduleItems = (schedulesResult.Responses?.[TABLES.SCHEDULES] ?? []) as MealScheduleItem[]
+  const scheduleItems = (schedulesResult.Responses?.[TABLES.MAIN] ?? []) as MealScheduleItem[]
   const schedulesByDate = Object.fromEntries(scheduleItems.map(s => [s.date, s]))
 
-  // 3. Fetch all global WFH periods to check overlap per date
+  // 3. Fetch all WFH periods to check overlap per date
   const wfhResult = await dynamo.send(new QueryCommand({
-    TableName: TABLES.WFH,
+    TableName: TABLES.MAIN,
     KeyConditionExpression: 'PK = :pk',
-    ExpressionAttributeValues: { ':pk': 'WFH' },
+    ExpressionAttributeValues: { ':pk': 'WFHPERIOD' },
   }))
-  const wfhPeriods = (wfhResult.Items ?? []) as GlobalWfhPeriodItem[]
+  const wfhPeriods = (wfhResult.Items ?? []) as WfhPeriodItem[]
 
-  // 4. Build one entry per day
+  // 4. Build one entry per weekday
   return dates.map(date => ({
     date,
     isToday:   date === today,

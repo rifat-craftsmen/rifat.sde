@@ -85,14 +85,24 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
   },
 ]
 
-const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!)
 
-console.log(`Deploying ${commands.length} command(s) to guild ${process.env.DISCORD_GUILD_ID}...`)
+const token = process.env.DISCORD_TOKEN
+const clientId = process.env.DISCORD_CLIENT_ID
+const guildId = process.env.DISCORD_GUILD_ID
+
+if (!token || !clientId || !guildId) {
+  throw new Error('Missing required environment variables: DISCORD_TOKEN, DISCORD_CLIENT_ID, or DISCORD_GUILD_ID')
+}
+
+const rest = new REST({ version: '10' }).setToken(token)
+
+
+console.log(`Deploying ${commands.length} command(s) to guild ${guildId}...`)
 
 await rest.put(
   Routes.applicationGuildCommands(
-    process.env.DISCORD_CLIENT_ID!,
-    process.env.DISCORD_GUILD_ID!,
+    clientId,
+    guildId,
   ),
   { body: commands },
 )

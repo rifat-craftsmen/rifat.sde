@@ -28,18 +28,25 @@ export async function handleCreateSchedule(req: AuthRequest, res: Response): Pro
   const occasionName         = opt<string | undefined>(options, 'occasion_name')
 
   // Validate date is at least tomorrow
-  const inputDate = new Date(date + 'T00:00:00')
+  const inputDate = new Date(date + 'T00:00:00Z')
   const tomorrow  = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  tomorrow.setHours(0, 0, 0, 0)
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+  tomorrow.setUTCHours(0, 0, 0, 0)
   if (inputDate < tomorrow) {
     res.json({ type: 4, data: { content: 'Schedule date must be at least tomorrow.', flags: 64 } })
     return
   }
 
+  // Reject weekends (Sat = 6, Sun = 0)
+  const dow = inputDate.getUTCDay()
+  if (dow === 0 || dow === 6) {
+    res.json({ type: 4, data: { content: 'Schedules cannot be created for weekends (Sat/Sun).', flags: 64 } })
+    return
+  }
+
   await createMealSchedule(
     { date, lunchEnabled, snacksEnabled, iftarEnabled, eventDinnerEnabled, optionalDinnerEnabled, occasionName },
-    req.user!.userId,
+    req.user!.discordId,
   )
 
   const meals = [

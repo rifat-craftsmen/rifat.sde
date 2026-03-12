@@ -33,7 +33,7 @@ function formatDay(day: ScheduleDay): string {
 }
 
 export async function handleMySchedule(req: AuthRequest, res: Response): Promise<void> {
-  const days = await getMySchedule(req.user!.userId)
+  const days = await getMySchedule(req.user!.discordId)
 
   const lines = days.map(formatDay)
   const legend = '*✅ opted in  ❌ opted out  ⬜ not set  ➖ not offered  🏠 WFH*'

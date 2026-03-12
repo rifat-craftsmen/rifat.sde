@@ -23,13 +23,29 @@ export const getTodayString = (): string => toDateString(getUTCToday())
 
 export const getTomorrowString = (): string => toDateString(addDays(getUTCToday(), 1))
 
-// 7-day window: tomorrow through tomorrow+6 (used for schedule views)
-export const getValidDateRange = (): { start: string; end: string } => {
-  const tomorrow = addDays(getUTCToday(), 1)
-  return {
-    start: toDateString(tomorrow),
-    end:   toDateString(addDays(tomorrow, 6)),
+// Returns true if a YYYY-MM-DD date falls on Saturday (6) or Sunday (0)
+export const isWeekend = (dateStr: string): boolean => {
+  const d = parseDateString(dateStr)
+  const dow = d.getUTCDay()  // 0 = Sun, 6 = Sat
+  return dow === 0 || dow === 6
+}
+
+// Returns an array of the next N weekday date strings (Mon–Fri) starting from `from`
+export const getNextNWeekdays = (n: number, from: Date = getUTCToday()): string[] => {
+  const weekdays: string[] = []
+  let current = from
+  while (weekdays.length < n) {
+    const dow = current.getUTCDay()
+    if (dow !== 0 && dow !== 6) weekdays.push(toDateString(current))
+    current = addDays(current, 1)
   }
+  return weekdays
+}
+
+// 7-weekday window starting from today (Mon–Fri only)
+export const getValidDateRange = (): { start: string; end: string } => {
+  const weekdays = getNextNWeekdays(7)
+  return { start: weekdays[0], end: weekdays[weekdays.length - 1] }
 }
 
 export const isDateInValidWindow = (dateStr: string): boolean => {
