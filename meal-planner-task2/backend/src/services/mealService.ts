@@ -42,7 +42,7 @@ export async function getMySchedule(discordId: string): Promise<ScheduleDay[]> {
   const schedulesResult = await dynamo.send(new BatchGetCommand({
     RequestItems: {
       [TABLES.MAIN]: {
-        Keys: dates.map(d => ({ PK: `SCHEDULE#${d}`, SK: 'METADATA' })),
+        Keys: dates.map(d => ({ PK: 'SCHEDULE', SK: d })),
       },
     },
   }))

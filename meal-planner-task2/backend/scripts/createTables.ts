@@ -32,13 +32,11 @@ async function main() {
   // Entity PK/SK patterns:
   //   UserProfile      PK: USER#{discordId}          SK: PROFILE
   //   MealRecord       PK: USER#{discordId}          SK: RECORD#{YYYY-MM-DD}
-  //   MealSchedule     PK: SCHEDULE#{YYYY-MM-DD}     SK: METADATA
-  //   Team             PK: TEAM#{teamId}             SK: METADATA
+  //   MealSchedule     PK: SCHEDULE                  SK: {YYYY-MM-DD}
+  //   Team             PK: TEAM                      SK: {teamId}
   //   WfhPeriod        PK: WFHPERIOD                 SK: {dateFrom}#{uuid}
   //   AuditLog         PK: AUDIT#{entityType}#{id}   SK: {timestamp}#{uuid}
   //   ACTIVE_USERS     PK: SYSTEM                    SK: ACTIVE_USERS
-  //   ALL_TEAMS        PK: SYSTEM                    SK: ALL_TEAMS
-  //   UPCOMING_SCHEDULES PK: SYSTEM                  SK: UPCOMING_SCHEDULES
   await createIfNotExists({
     TableName: MAIN,
     BillingMode: 'PAY_PER_REQUEST',

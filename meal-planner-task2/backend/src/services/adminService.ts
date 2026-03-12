@@ -1,8 +1,8 @@
-import { PutCommand, DeleteCommand, GetCommand, BatchGetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import { getTodayString } from '../utils/dateHelpers.js'
 import { writeAuditLog } from './auditService.js'
-import type { CreateScheduleData, MealScheduleItem, UpcomingSchedulesItem } from '../types/index.js'
+import type { CreateScheduleData, MealScheduleItem } from '../types/index.js'
 
 // ── Meal Schedule ─────────────────────────────────────────────────────────────
 
@@ -16,8 +16,8 @@ export async function createMealSchedule(
   await dynamo.send(new PutCommand({
     TableName: TABLES.MAIN,
     Item: {
-      PK:                    `SCHEDULE#${data.date}`,
-      SK:                    'METADATA',
+      PK:                    'SCHEDULE',
+      SK:                    data.date,
       date:                  data.date,
       lunchEnabled:          data.lunchEnabled,
       snacksEnabled:         data.snacksEnabled,
@@ -29,14 +29,6 @@ export async function createMealSchedule(
       createdAt: now,
       updatedAt: now,
     } satisfies MealScheduleItem,
-  }))
-
-  // Maintain UPCOMING_SCHEDULES sentinel
-  await dynamo.send(new UpdateCommand({
-    TableName:                 TABLES.MAIN,
-    Key:                       { PK: 'SYSTEM', SK: 'UPCOMING_SCHEDULES' },
-    UpdateExpression:          'ADD scheduleDates :d SET updatedAt = :now',
-    ExpressionAttributeValues: { ':d': new Set([data.date]), ':now': now },
   }))
 
   await writeAuditLog({
@@ -59,43 +51,22 @@ export async function createMealSchedule(
 export async function getAllMealSchedules(): Promise<MealScheduleItem[]> {
   const today = getTodayString()
 
-  // Get all published dates from UPCOMING_SCHEDULES sentinel
-  const sentinelResult = await dynamo.send(new GetCommand({
+  const result = await dynamo.send(new QueryCommand({
     TableName: TABLES.MAIN,
-    Key: { PK: 'SYSTEM', SK: 'UPCOMING_SCHEDULES' },
-  }))
-  const sentinel = sentinelResult.Item as UpcomingSchedulesItem | undefined
-  if (!sentinel?.scheduleDates?.size) return []
-
-  // BatchGet all schedule items, filter to upcoming dates in application
-  const dates = [...sentinel.scheduleDates]
-  const batchResult = await dynamo.send(new BatchGetCommand({
-    RequestItems: {
-      [TABLES.MAIN]: {
-        Keys: dates.map(d => ({ PK: `SCHEDULE#${d}`, SK: 'METADATA' })),
-      },
+    KeyConditionExpression: 'PK = :pk AND SK >= :today',
+    ExpressionAttributeValues: {
+      ':pk':    'SCHEDULE',
+      ':today': today,
     },
   }))
 
-  return ((batchResult.Responses?.[TABLES.MAIN] ?? []) as MealScheduleItem[])
-    .filter(s => s.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date))
+  return (result.Items ?? []) as MealScheduleItem[]
 }
 
 export async function deleteMealSchedule(date: string): Promise<void> {
-  const now = new Date().toISOString()
-
   await dynamo.send(new DeleteCommand({
     TableName: TABLES.MAIN,
-    Key: { PK: `SCHEDULE#${date}`, SK: 'METADATA' },
-  }))
-
-  // Remove from UPCOMING_SCHEDULES sentinel
-  await dynamo.send(new UpdateCommand({
-    TableName:                 TABLES.MAIN,
-    Key:                       { PK: 'SYSTEM', SK: 'UPCOMING_SCHEDULES' },
-    UpdateExpression:          'DELETE scheduleDates :d SET updatedAt = :now',
-    ExpressionAttributeValues: { ':d': new Set([date]), ':now': now },
+    Key: { PK: 'SCHEDULE', SK: date },
   }))
 }
 

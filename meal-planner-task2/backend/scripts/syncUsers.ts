@@ -79,14 +79,14 @@ async function syncUsers() {
       if (user.status === 'ACTIVE') {
         await dynamo.send(new UpdateCommand({
           TableName:                 TABLES.MAIN,
-          Key:                       { PK: `TEAM#${user.teamId}`, SK: 'METADATA' },
+          Key:                       { PK: 'TEAM', SK: user.teamId },
           UpdateExpression:          'ADD memberIds :did',
           ExpressionAttributeValues: { ':did': new Set([user.discordId]) },
         }))
       } else {
         await dynamo.send(new UpdateCommand({
           TableName:                 TABLES.MAIN,
-          Key:                       { PK: `TEAM#${user.teamId}`, SK: 'METADATA' },
+          Key:                       { PK: 'TEAM', SK: user.teamId },
           UpdateExpression:          'DELETE memberIds :did',
           ExpressionAttributeValues: { ':did': new Set([user.discordId]) },
         }))
