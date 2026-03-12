@@ -2,13 +2,13 @@
 - Author: Rifat Ahmed
 - Task: 2
 - Iteration: 1
-- Version: v1
+- Version: v2
 
 ---
 
 ## Summary
 
-This document introduces a discord based Meal Headcount Planner system. Employees update their meal choices and work-from-home status through slash commands without leaving the platform the team already uses throughout the day. Leads and admins get the same real-time visibility — employee participation, headcounts, and overrides — through the same interface. Records are prepared automatically each night, so employees only need to act when their plans differ from the default.
+This document introduces a Discord-based Meal Headcount Planner system. Employees update their meal choices and work-from-home status through slash commands without leaving the platform the team already uses throughout the day. Leads and admins get the same real-time visibility — employee participation, headcounts, and overrides — through the same interface. Records are prepared automatically each night, so employees only need to act when their plans differ from the default.
 
 ---
 
@@ -20,18 +20,18 @@ This document introduces a discord based Meal Headcount Planner system. Employee
 
 ---
 
-
-
 ## Goals and Non-Goals
 
 ### Goals
-- Discord slash commands for employees to view their 7-day schedule and update meal choices and WFH status.
+- Discord slash commands for employees to view their 7-day weekday schedule and update meal choices and WFH status.
 - Slash commands for Team Leads to view per-employee daily participation, and override employee choices.
 - Slash commands for Admins to manage meal schedules, company-wide WFH periods, headcount, and bulk updates.
-- Serverless backend on AWS Lambda exposed via Lambda Function URL (no API Gateway).
-- Nightly cron job (EventBridge at 9 PM) that pre-creates tomorrow's records for all active users.
-- DynamoDB as the sole data store — access-pattern-first design.
+- Serverless backend on AWS Lambda exposed via API Gateway HTTP API.
+- Nightly cron job (EventBridge at 9 PM BST) that pre-creates tomorrow's records for all active users.
+- Morning cron job (EventBridge at 9 AM BST) that posts a headcount report to a Discord channel via webhook.
+- DynamoDB as the sole data store — single table, zero GSIs, access-pattern-first design.
 - User management via YAML files and a sync script.
+- Weekends (Saturday and Sunday) are excluded from all schedule and meal record operations.
 
 ### Non-Goals
 - Web frontend or dashboard of any kind.
@@ -47,10 +47,10 @@ This document introduces a discord based Meal Headcount Planner system. Employee
 ### Functional Requirements
 
 **Employee**
-- Employees view their 7-day meal schedule, including which meal types are available on each date and their current selections.
+- Employees view their 7-day meal schedule (weekdays only, Mon–Fri), including which meal types are available on each date and their current selections.
 - Employees create a meal record for a date within the valid window.
 - Employees update their meal choices and work-from-home status for any date within the valid window.
-- Employees are blocked from editing records outside the valid window (today is locked; past dates and dates beyond 6 days ahead are rejected).
+- Employees are blocked from editing records outside the valid window (today is locked; past dates, weekends, and dates beyond the 7-weekday window are rejected).
 
 **Team Lead**
 - Team Leads view their own team's participation, including each member's name, status, and monthly WFH count.
@@ -61,7 +61,7 @@ This document introduces a discord based Meal Headcount Planner system. Employee
 - Team Lead operations are strictly scoped to their own team — actions on members of other teams are rejected.
 
 **Admin**
-- Admins create a meal schedule for a date, specifying which meal types are enabled and an optional occasion name.
+- Admins create a meal schedule for a weekday date, specifying which meal types are enabled and an optional occasion name.
 - Admins view all upcoming meal schedules.
 - Admins update a meal schedule for a date.
 - Admins delete a meal schedule for a date.
@@ -71,13 +71,17 @@ This document introduces a discord based Meal Headcount Planner system. Employee
 - Admins delete a WFH period.
 - Admins view the daily headcount for a date: total meal counts, team-by-team breakdown, and office vs WFH split.
 - Admins view per-employee meal participation for a date across all teams.
-- Admin apply a bulk action across all members for a date.
+- Admins apply a bulk action across all members for a date.
 - Admins perform all Team Lead actions without team scope restriction.
 
 **Nightly Automation**
-- The system automatically creates tomorrow's meal records each night for all active users.
-- Records are pre-filled using the published schedule for that date
+- The system automatically creates tomorrow's meal records each night for all active users (weekdays only — cron skips Saturday and Sunday).
+- Records are pre-filled using the published schedule for that date.
 - If a user has already submitted a record for that date, only null meal fields are filled in — confirmed choices are never overwritten.
+
+**Morning Report**
+- Each weekday morning the system posts a headcount summary to a configured Discord channel via webhook.
+- The report shows total counts per meal type and a breakdown by team.
 
 **User Management**
 - User and team data is managed through YAML files and a sync script; no API endpoints exist for user CRUD.
@@ -85,33 +89,31 @@ This document introduces a discord based Meal Headcount Planner system. Employee
 
 ### Validation Rules
 - Date must be in `YYYY-MM-DD` format.
-- Meal update dates must be within the 7-day valid window (today + 6 days).
-- Schedule creation date must be at least tomorrow.
+- Weekends (Saturday and Sunday) are rejected for all schedule creation and meal record operations.
+- Meal update dates must be within the 7-weekday valid window.
+- Schedule creation date must be at least tomorrow and must be a weekday.
 - `dateTo` must be ≥ `dateFrom` for global WFH periods.
-- `bulkUpdate`, `userIds` must be a non-empty array of strings.
+- `bulkUpdate`, `discordIds` must be a non-empty array of strings.
 
 ---
-
-
 
 ## Tech Stack
 
 | Layer | Choice | Rationale |
 |-------|--------|-----------|
-| Language | TypeScript / Node.js 20 | Type safety across bot and backend; single language reduces context-switching |
+| Language | TypeScript / Node.js 22 | Type safety across bot and backend; single language reduces context-switching |
 | Bot library | `@discordjs/rest` + `discord-interactions` | REST client for command registration; `discord-interactions` for Ed25519 signature verification on the interactions endpoint |
 | Backend framework | Express.js | Minimal overhead; reused unchanged between local dev and Lambda |
 | Lambda adapter | `@vendia/serverless-express` | Wraps Express for Lambda with zero code changes to the app itself |
-| Deployment | AWS Lambda Function URL | No API Gateway cost (~$3.50/M requests) or configuration; direct HTTPS URL for a single known client |
-| Database | Amazon DynamoDB | Serverless, PAY_PER_REQUEST billing |
-| Build | esbuild | Bundles TypeScript + dependencies to a single ~3–5 MB file; `--external:@aws-sdk` excludes the SDK already present in Lambda runtime, reducing upload from ~150 MB to ~5 MB |
+| Deployment | AWS API Gateway HTTP API + Lambda | HTTP API routes all requests to the API Lambda; more reliable than Lambda Function URL for Discord's verification flow |
+| Database | Amazon DynamoDB | Serverless, PAY_PER_REQUEST billing, single table with 0 GSIs |
+| Build | esbuild | Bundles TypeScript + dependencies to a single file; `--external:@aws-sdk` excludes the SDK already in the Lambda runtime |
 
 ---
 
 ## Architecture Overview
 
-
-Discord uses the **Interactions Endpoint** model instead of a WebSocket gateway. When a user runs a slash command, Discord sends a POST to the configured Lambda Function URL. No always-on process is needed.
+Discord uses the **Interactions Endpoint** model instead of a WebSocket gateway. When a user runs a slash command, Discord sends a POST to the API Gateway endpoint. No always-on process is needed.
 
 ```
 Discord User
@@ -120,189 +122,214 @@ Discord User
 Discord
   │  POST /discord/interactions  (Ed25519 signed)
   ▼
+API Gateway HTTP API
+  │  (optional: Lambda Authorizer for signature verification)
+  ▼
 API Lambda
-  │  [1] verify Ed25519 signature        
-  │  [2] fetch user profile by discordId     
-  │  [3] map Discord role IDs → app role 
-  │  [4] check command role requirement for authorization 
-  │  [5] execute command handler          
+  │  [1] verify Ed25519 signature 
+  │  [2] fetch user profile by discordId  
+  │  [3] map Discord guild role IDs → app role  
+  │  [4] check command role requirement  
+  │  [5] execute command handler
   ▼
 Discord  (delivers interaction response to user)
 
 ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
 
-EventBridge Scheduler  (9 PM BST)
-  │  invoke
-  ▼
-Cron Lambda
-  │  BatchWrite
-  ▼
-DynamoDB
+EventBridge  (9 PM BST weekdays)          EventBridge  (9 AM BST weekdays)
+  │  { "type": "CREATE_RECORDS" }           │  { "type": "SEND_REPORT" }
+  ▼                                         ▼
+Cron Lambda ──────────────────────────────────────────
+  │  BatchWrite records for tomorrow    │  Aggregate today's records → POST webhook
+  ▼                                     ▼
+DynamoDB                            Discord channel (via HEADCOUNT_WEBHOOK_URL)
 ```
 
-
-
-
-Two independently deployable Lambda functions. No persistent bot process. 
+Two independently deployable Lambda functions. No persistent bot process.
 
 | Component | Runtime | Trigger |
 |-----------|---------|---------|
-| API Lambda | AWS Lambda, Node.js 20, arm64 | Lambda Function URL (HTTPS) — handles both API routes and Discord interactions endpoint |
-| Cron Lambda | AWS Lambda, Node.js 20, arm64 | EventBridge Scheduler, 9 PM BST daily |
-
+| API Lambda | AWS Lambda, Node.js 22 | API Gateway HTTP API — handles all Express routes including `/discord/interactions` |
+| Cron Lambda | AWS Lambda, Node.js 22 | Two EventBridge rules: evening record creation + morning headcount report |
 
 The Express app (`app.ts`) has no awareness of Lambda. `lambda.ts` wraps it with `@vendia/serverless-express` and exports the handler. The same `app.ts` is imported by `server.ts` for local `app.listen()` development. No code diverges between environments.
 
+### Lambda Authorizer 
+
+API Gateway supports a **Lambda Authorizer** that runs before the main Lambda. The planned approach is to move Ed25519 signature verification into a dedicated authorizer Lambda:
+
+- The authorizer receives the raw request (headers + body) and verifies the Discord signature.
+- On success it returns an IAM allow policy; on failure it returns deny (Discord sees 401).
+- The main Lambda no longer needs `discordVerify` middleware — user profile lookup (`discordAuth`) stays in the main Lambda.
+- No caching benefit since every Discord request has a unique signature (cache TTL = 0).
+- Requires a new `authorizer.ts` Lambda and updating API Gateway configuration.
 
 ---
-
 
 ## Database Design
 
-Four DynamoDB tables. **1 GSI total** — on `mealPlanner`.
+One DynamoDB table. **0 GSIs** — all access patterns are served by primary key lookups, range queries, and sentinel items.
 
-### mealPlanner (3 item types)
+**Table name:** `trainee-2026-rifat-mhp-v2`
 
-**UserProfile** — `PK: {discordId}` · `SK: PROFILE`
-- `discordId`, `name`, `email`, `role`, `status`
-- `teamId`, `teamName` (denormalized from teams)
-- `wfhCount`, `wfhMonth` (monthly WFH counter, resets each month)
-- `createdAt`, `updatedAt` (ISO 8601 timestamps)
+### Entity Types
 
-**MealRecord** — `PK: {discordId}` · `SK: RECORD#{YYYY-MM-DD}`
-- `lunch`, `snacks`, `iftar`, `eventDinner`, `optionalDinner` (`boolean | null`)
-- `workFromHome` (`boolean`)
-- `teamId`, `teamName` (denormalized for headcount grouping)
-- `lastModifiedBy` (discordId of modifier, or 'SYSTEM' for cron)
-- `gsi1pk: RECORD#{date}` → date-records-index
-- `createdAt`, `updatedAt` (ISO 8601 timestamps)
+| Entity | PK | SK |
+|--------|----|----|
+| User Profile | `USER#{discordId}` | `PROFILE` |
+| Meal Record | `USER#{discordId}` | `RECORD#{YYYY-MM-DD}` |
+| Meal Schedule | `SCHEDULE#{YYYY-MM-DD}` | `METADATA` |
+| Team | `TEAM#{teamId}` | `METADATA` |
+| WFH Period | `WFHPERIOD` | `{dateFrom}#{uuid}` |
+| Audit Log | `AUDIT#{entityType}#{entityId}` | `{timestamp}#{uuid}` |
+| System Sentinel | `SYSTEM` | `ACTIVE_USERS` \| `ALL_TEAMS` \| `UPCOMING_SCHEDULES` |
 
-**Active User List** — `PK: SYSTEM` · `SK: ACTIVE_USERS`
-- `memberIds: StringSet` — all active discordIds; read by cron each night to avoid a full table scan
-- `updatedAt` (ISO 8601 timestamp)
+### Sentinel Pattern
 
+Sentinel items in the `SYSTEM` partition act as pre-built indexes to avoid full table scans.
 
-**GSIs**
+| SK | Contents | Maintained by |
+|----|----------|---------------|
+| `ACTIVE_USERS` | StringSet of active discordIds | `syncUsers.ts` |
+| `ALL_TEAMS` | StringSet of teamIds | `syncTeams.ts` |
+| `UPCOMING_SCHEDULES` | StringSet of schedule dates | `adminService` on create/delete |
 
-| Index | GSI PK | GSI SK | Purpose |
-|-------|--------|--------|---------|
-| `date-records-index` | `gsi1pk` = RECORD#{date} | `PK` = discordId | Query all meal records for a specific date |
+**Rule:** Every write that affects a sentinel must also update the relevant sentinel item in the same operation.
 
+### Key Design Decisions
 
-### mealSchedules
-
-`PK: date (YYYY-MM-DD)`
-- `lunchEnabled`, `snacksEnabled`, `iftarEnabled`, `eventDinnerEnabled`, `optionalDinnerEnabled`
-- `occasionName` (optional)
-- `createdAt`, `updatedAt` (ISO 8601 timestamp)
-
-### teams
-
-`PK: teamId`
-- `name`, `leadId`
-- `memberIds: StringSet` (active member discordIds)
-- `createdAt`, `updatedAt` (ISO 8601 timestamps)
-
-
-### globalWfhPeriods
-
-`PK: 'WFH'` · `SK: id (UUID)` — Query PK='WFH' returns all periods in one call; no GSI needed.
-- `dateFrom`, `dateTo` (YYYY-MM-DD)
-- `note` (optional)
-- `createdAt`, `updatedAt` (ISO 8601 timestamp)
-
+- `discordId` is the sole user identifier — no internal userId concept.
+- Meal record SK `RECORD#{date}` enables BETWEEN range queries for weekday windows without a GSI.
+- WFH Period SK `{dateFrom}#{uuid}` makes Query results naturally date-sorted — no GSI needed.
+- Audit log SK `{timestamp}#{uuid}` ensures chronological ordering and uniqueness.
+- `teamId` and `teamName` are denormalized onto UserProfile and MealRecord to avoid joins.
 
 ### Access Patterns
 
+**User Profile**
+
 | Pattern | Operation |
 |---------|-----------|
-| **mealPlanner** | |
-| Get user profile | GetItem `PK={discordId}`, `SK=PROFILE` |
-| Get user's single meal record | GetItem `PK={discordId}`, `SK=RECORD#{date}` |
-| User's 7-day records | Query `PK={discordId}`, SK BETWEEN `RECORD#{today}` AND `RECORD#{+6d}` |
-| Insert meal record | PutItem `PK={discordId}`, `SK=RECORD#{date}` |
-| Update WFH counter on profile | UpdateItem `PK={discordId}`, `SK=PROFILE` ADD `wfhCount` |
-| All records for a date (headcount) | Query `date-records-index` (`gsi1pk=RECORD#{date}`) |
-| All active users (cron) | GetItem `PK=SYSTEM`, `SK=ACTIVE_USERS` → BatchGetItem profiles |
-| **mealSchedules** | |
-| Create schedule | PutItem `PK=date` |
-| Get schedule for a date | GetItem `PK=date` |
-| Update schedule | UpdateItem `PK=date` |
-| Delete schedule | DeleteItem `PK=date` |
-| List upcoming schedules | Scan with filter `date ≥ today` *(low volume — at most ~30 items ever exist)* |
-| **teams** | |
-| Get team + member list | GetItem `PK=teamId` |
-| Team member profiles | GetItem `teams PK=teamId` → memberIds → BatchGetItem profiles |
-| Update team membership | UpdateItem `PK=teamId` ADD/DELETE `memberIds` |
-| **globalWfhPeriods** | |
-| List all WFH periods | Query `PK='WFH'` |
-| Create WFH period | PutItem `PK='WFH'`, `SK={uuid}` |
-| Update WFH period | UpdateItem `PK='WFH'`, `SK={uuid}` |
-| Delete WFH period | DeleteItem `PK='WFH'`, `SK={uuid}` |
+| Get user profile by Discord ID | GetItem `PK=USER#{discordId}` `SK=PROFILE` |
+| Update WFH counter for the month | UpdateItem `PK=USER#{discordId}` `SK=PROFILE` ADD `wfhCount` |
+| Batch get multiple user profiles | BatchGetItem multiple `PK=USER#{discordId}` `SK=PROFILE` |
+
+**Meal Record**
+
+| Pattern | Operation |
+|---------|-----------|
+| Get user's record for a specific date | GetItem `PK=USER#{discordId}` `SK=RECORD#{date}` |
+| Get user's next 7 weekday records | Query `PK=USER#{discordId}` SK BETWEEN `RECORD#{today}` AND `RECORD#{endDate}` |
+| Create or update a meal record | PutItem / UpdateItem `PK=USER#{discordId}` `SK=RECORD#{date}` |
+| Get all records for a date (headcount) | GetItem `SYSTEM/ACTIVE_USERS` → BatchGetItem `PK=USER#{discordId}` `SK=RECORD#{date}` per active user |
+| Batch create records for tomorrow (cron) | BatchWriteItem `PK=USER#{discordId}` `SK=RECORD#{date}` in chunks of 25 |
+| Get team members' records for a date | GetItem `TEAM#{teamId}/METADATA` → BatchGetItem `PK=USER#{discordId}` `SK=RECORD#{date}` per member |
+
+**Meal Schedule**
+
+| Pattern | Operation |
+|---------|-----------|
+| Get schedule for a specific date | GetItem `PK=SCHEDULE#{date}` `SK=METADATA` |
+| Create schedule for a date | PutItem `PK=SCHEDULE#{date}` `SK=METADATA` → UpdateItem `SYSTEM/UPCOMING_SCHEDULES` ADD `scheduleDates` |
+| Update schedule for a date | UpdateItem `PK=SCHEDULE#{date}` `SK=METADATA` |
+| Delete schedule for a date | DeleteItem `PK=SCHEDULE#{date}` `SK=METADATA` → UpdateItem `SYSTEM/UPCOMING_SCHEDULES` DELETE `scheduleDates` |
+| List all upcoming schedules | GetItem `SYSTEM/UPCOMING_SCHEDULES` → BatchGetItem `PK=SCHEDULE#{date}` `SK=METADATA` per date → filter `date >= today` in app |
+
+**Team**
+
+| Pattern | Operation |
+|---------|-----------|
+| Get team details and member list | GetItem `PK=TEAM#{teamId}` `SK=METADATA` |
+| Get all team member profiles | GetItem `TEAM#{teamId}/METADATA` → BatchGetItem `PK=USER#{discordId}` `SK=PROFILE` per member |
+| Get all teams | GetItem `SYSTEM/ALL_TEAMS` → BatchGetItem `PK=TEAM#{teamId}` `SK=METADATA` per team |
+| Get all users grouped by team | GetItem `SYSTEM/ACTIVE_USERS` → BatchGetItem all `PK=USER#{discordId}` `SK=PROFILE` → group by `teamId` in app |
+| Update team membership | UpdateItem `PK=TEAM#{teamId}` `SK=METADATA` ADD/DELETE `memberIds` |
+
+**WFH Period**
+
+| Pattern | Operation |
+|---------|-----------|
+| List all WFH periods sorted by start date | Query `PK=WFHPERIOD` (SK format `{dateFrom}#{uuid}` → naturally date-sorted) |
+| Create WFH period | PutItem `PK=WFHPERIOD` `SK={dateFrom}#{uuid}` |
+| Update WFH period | UpdateItem `PK=WFHPERIOD` `SK={dateFrom}#{uuid}` |
+| Delete WFH period | DeleteItem `PK=WFHPERIOD` `SK={dateFrom}#{uuid}` |
+| Check if a date falls within any WFH period | Query `PK=WFHPERIOD` → filter in app (`dateFrom <= date <= dateTo`) |
+
+**Audit Log**
+
+| Pattern | Operation |
+|---------|-----------|
+| Write audit entry on every mutation | PutItem `PK=AUDIT#{entityType}#{entityId}` `SK={timestamp}#{uuid}` |
+| Get full change history for an entity | Query `PK=AUDIT#{entityType}#{entityId}` (chronological by SK) |
+
+**System Sentinels**
+
+| Pattern | Operation |
+|---------|-----------|
+| Get all active Discord IDs | GetItem `PK=SYSTEM` `SK=ACTIVE_USERS` |
+| Add/remove user from active list | UpdateItem `PK=SYSTEM` `SK=ACTIVE_USERS` ADD/DELETE `memberIds` |
+| Get all team IDs | GetItem `PK=SYSTEM` `SK=ALL_TEAMS` |
+| Add/remove team from list | UpdateItem `PK=SYSTEM` `SK=ALL_TEAMS` ADD/DELETE `teamIds` |
+| Get all published schedule dates | GetItem `PK=SYSTEM` `SK=UPCOMING_SCHEDULES` |
+| Add/remove date from schedule list | UpdateItem `PK=SYSTEM` `SK=UPCOMING_SCHEDULES` ADD/DELETE `scheduleDates` |
 
 ---
-
 
 ## Authentication & Authorization
 
-Membership in the organization's Discord server is the identity boundary. No JWT, no session, no login endpoint is used. 
+Membership in the organization's Discord server is the identity boundary. No JWT, no session, no login endpoint is used.
 
-### Authentication — Ed25519 Signature Verification
+### Request Pipeline
 
-Every interaction request from Discord is signed using the application's Ed25519 private key. The `discordVerify` middleware validates this signature against the application's `DISCORD_PUBLIC_KEY` before any other processing occurs. Requests with an invalid or missing signature are rejected with `401`. This is Discord's required security mechanism for interactions endpoints — Discord itself deactivates endpoints that fail to validate signatures correctly.
+Every incoming interaction passes through three middleware layers in order before reaching the command handler:
 
-### Identity Resolution
+```
+discordVerify  →  discordAuth  →  requireRole  →  command handler
+```
 
-The interaction payload includes `interaction.member.user.id`, which is the invoking user's Discord snowflake ID. The `discordAuth` middleware uses this discordId to fetch the user profile (`PK={discordId}`, `SK=PROFILE`) and resolves `teamId`, attaching them to `req.user`. If no matching user is found in DynamoDB, the request is rejected.
+### Step 1 — Ed25519 Signature Verification (`discordVerify`)
 
+Every request from Discord is signed with the application's Ed25519 private key. The `discordVerify` middleware:
 
-### Role Resolution
+1. Reads the raw request body as a Buffer (via `express.raw({ type: 'application/json' })`).
+2. Extracts `x-signature-ed25519` and `x-signature-timestamp` headers.
+3. Calls `verifyKey(body, signature, timestamp, DISCORD_PUBLIC_KEY)` from `discord-interactions`.
+4. Returns `401` immediately if signature is missing or invalid.
 
-The interaction payload includes `interaction.member.roles`, an array of Discord role ID snowflakes assigned to the invoking user. The backend maps these IDs to application roles using environment variables configured at deployment time:
+**PING handling:** Discord sends a type-1 PING to verify the endpoint when the Interactions URL is first configured. After signature verification passes, the middleware returns `{ type: 1 }` immediately for PING requests without proceeding further down the pipeline. This satisfies Discord's 3-second verification window.
 
-| Env var | App Role | Assigned capabilities |
-|---------|----------|-----------------------|
+The `DISCORD_PUBLIC_KEY` environment variable must match the public key shown in the Discord Developer Portal under the application's General Information.
+
+### Step 2 — Identity & Profile Resolution (`discordAuth`)
+
+After signature verification, the middleware:
+
+1. Extracts `interaction.member.user.id` (the invoking user's Discord snowflake ID) and `interaction.member.roles` (array of Discord guild role ID snowflakes) from the verified payload.
+2. Fetches the user profile: GetItem `PK=USER#{discordId}` `SK=PROFILE`.
+3. If no profile exists, returns an ephemeral error — the user is not registered.
+4. Resolves the application role from the Discord guild roles (see Step 3).
+5. Attaches `{ discordId, role, teamId }` to `req.user` for downstream use.
+
+### Step 3 — Role Resolution
+
+Discord guild role IDs are mapped to application roles using environment variables set at deployment time. The check is evaluated in priority order — first match wins:
+
+| Env var | App Role | Capabilities |
+|---------|----------|--------------|
 | `DISCORD_ROLE_ADMIN` | `ADMIN` | All commands |
-| `DISCORD_ROLE_LEAD` | `LEAD` | Team views, employee record overrides, bulk updates (own team only) |
+| `DISCORD_ROLE_LEAD` | `LEAD` | Team views, record overrides, bulk updates (own team only) |
 | `DISCORD_ROLE_LOGISTICS` | `LOGISTICS` | Headcount and participation views |
-| `DISCORD_ROLE_EMPLOYEE` | `EMPLOYEE` | Own schedule and meal updates only |
+| _(no match)_ | `EMPLOYEE` | Own schedule and meal updates only |
 
-If a user holds multiple qualifying roles, the highest-privilege role takes precedence (ADMIN > LEAD > LOGISTICS > EMPLOYEE). The resolved role is attached to `req.user.role`.
+Priority: ADMIN > LEAD > LOGISTICS > EMPLOYEE. If a user holds multiple qualifying roles, the highest-privilege role is assigned.
 
-### Authorization
+Role is intentionally **not** stored in DynamoDB — it is resolved fresh from the Discord guild roles on every request. Role changes in Discord take effect immediately with no sync required.
 
-The `requireRole` middleware compares `req.user.role` against the set of roles permitted for the command being executed. Requests from users with insufficient role are rejected with `403`.
+### Step 4 — Authorization (`requireRole`)
 
-Team Lead scope is enforced at the service layer in addition to the role check: a Lead's operations (participation view, record overrides, bulk updates) are restricted to users whose `teamId` matches `req.user.teamId`. A Lead cannot act on members of another team even if they hold the correct role.
+Each command handler is protected by `requireRole(allowedRoles)`. The middleware compares `req.user.role` against the allowed set. If the role is insufficient, it returns an ephemeral error reply to the user.
 
----
-
-
-## Discord Commands
-
-| Command | Role | Visibility | Description |
-|---------|------|------------|-------------|
-| `/my-schedule` | All | Ephemeral | View 7-day meal schedule and current choices |
-| `/create-meal` | All | Ephemeral | Create meal choices and WFH for a date |
-| `/update-meal` | All | Ephemeral | Update meal choices and WFH for a date |
-| `/create-schedule` | ADMIN | Public | Set meal options for a date |
-| `/list-schedules` | ADMIN | Ephemeral | View upcoming schedules |
-| `/update-schedule` | ADMIN | Ephemeral | Update meal options for a date |
-| `/delete-schedule` | ADMIN | Ephemeral | Remove a date's schedule |
-| `/set-wfh-period` | ADMIN | Public | Create a company-wide WFH date range |
-| `/list-wfh-periods` | ADMIN | Ephemeral | View active WFH periods |
-| `/update-wfh-period` | ADMIN | Ephemeral | Update a WFH period's date range or note |
-
-| `/delete-wfh-period` | ADMIN | Ephemeral | Remove a WFH period |
-| `/headcount` | ADMIN, LOGISTICS | Public | Daily meal totals and team breakdown |
-| `/participation` | ADMIN, LEAD | Ephemeral | Per-employee meal detail for a date |
-| `/team-members` | LEAD | Ephemeral | View own team participation |
-| `/employee-schedule` | LEAD | Ephemeral | View a team member's 7-day schedule |
-| `/create-employee-meal` | ADMIN, LEAD | Ephemeral | Create an employee's record |
-| `/update-employee-meal` | ADMIN, LEAD | Ephemeral | Override an employee's record |
-| `/bulk-update` | ADMIN, LEAD | Ephemeral | Apply one action to all team members |
-
-Public responses (`/create-schedule`, `/set-wfh-period`, `/headcount`) post embeds visible to the channel. All others are ephemeral.
+**Team Lead scope** is enforced separately at the service layer. A Lead's operations (participation view, record overrides, bulk updates) are restricted to users whose `teamId` matches `req.user.teamId`. A Lead cannot act on members of another team even if they hold the correct role — the service layer checks team membership before executing.
 
 ---
 
@@ -310,41 +337,69 @@ Public responses (`/create-schedule`, `/set-wfh-period`, `/headcount`) post embe
 
 ### Employee
 
-**Viewing their schedule** — An employee runs `/my-schedule`. The bot identifies their Discord role and sends the request to the backend on their behalf. The backend confirms their identity, fetches their meal records for the next 7 days alongside the published schedules and any active WFH periods for those dates, and returns a personal schedule view as a private reply.
+**Viewing their schedule** — An employee runs `/my-schedule`. The backend confirms their identity, fetches their meal records for the next 7 weekdays alongside the published schedules and any active WFH periods for those dates, and returns a personal schedule view as a private reply.
 
 **Creating a record manually** — An employee runs `/create-meal` for a date where they want to set meal choices. The backend creates the record with their specified values and responds privately.
 
-**Updating a meal record** — An employee runs `/update-meal` with a date and their choices (e.g. no lunch, working from home). The backend validates the date is within the editable window, saves the updated record, and adjusts their monthly WFH count if their work location changed. The employee receives a private confirmation.
+**Updating a meal record** — An employee runs `/update-meal` with a date and their choices (e.g. no lunch, working from home). The backend validates the date is within the editable window (weekdays only), saves the updated record, and adjusts their monthly WFH count if their work location changed. The employee receives a private confirmation.
 
 ### Team Lead
 
-**Viewing their team** — A Lead runs `/team-members`. The backend verifies their role, retrieves the team's member list, fetches each member's profile, and returns a private summary showing each member's name, status, and WFH count for the month.
+**Viewing their team** — A Lead runs `/team-members`. The backend retrieves the team's member list, fetches each member's profile, and returns a private summary showing each member's name, status, and WFH count for the month.
 
-**Viewing a member's schedule** — A Lead runs `/employee-schedule` for a specific team member. The backend confirms the member belongs to the Lead's team, then returns that member's 7-day schedule view privately.
+**Viewing a member's schedule** — A Lead runs `/employee-schedule` for a specific team member. The backend confirms the member belongs to the Lead's team, then returns that member's 7-weekday schedule view privately.
 
 **Viewing daily participation** — A Lead runs `/participation` for a date. The backend returns each team member's meal selections and work location for that day as a private reply.
 
-**Overriding a member's record** — A Lead runs `/update-employee-meal` targeting a team member. The backend checks the member belongs to the Lead's team before saving the updated record, recording the Lead as the last modifier.
+**Overriding a member's record** — A Lead runs `/update-employee-meal` targeting a team member. The backend checks the member belongs to the Lead's team before saving the updated record.
 
 **Bulk update** — A Lead runs `/bulk-update` with an action (e.g. mark all as WFH) for a date. The backend applies the action across every member of their team and responds privately with a confirmation.
 
 ### Admin
 
-**Creating a schedule** — An Admin runs `/create-schedule` for a date, selecting which meal types are available and an optional occasion name. The record is saved and a public confirmation is posted to the channel.
+**Creating a schedule** — An Admin runs `/create-schedule` for a weekday date, selecting which meal types are available and an optional occasion name. The backend rejects weekend dates. The record is saved, the `UPCOMING_SCHEDULES` sentinel is updated, and a public confirmation is posted to the channel.
 
 **Managing WFH periods** — An Admin runs `/set-wfh-period` with a date range and optional note. The period is saved and a public announcement is posted. Existing periods can be listed with `/list-wfh-periods` or removed with `/delete-wfh-period`.
 
-**Checking headcount** — An Admin or Logistics member runs `/headcount` for a date. The backend tallies all meal records for that day — total counts per meal type, a breakdown by team, and an office vs WFH split — and posts the result publicly to the channel.
+**Checking headcount** — An Admin or Logistics member runs `/headcount` for a date. The backend reads all active users from the `ACTIVE_USERS` sentinel, batch-fetches their meal records for that day, tallies totals per meal type with a team breakdown and office vs WFH split, and posts the result publicly.
 
 **Viewing full participation** — An Admin runs `/participation` for a date and receives a private per-employee breakdown across all teams, not scoped to a single team like the Lead view.
 
 ### Nightly Automation
 
-Each night at 9 PM, the system runs automatically. It fetches the list of all active users and tomorrow's published schedule (if one exists). For each active user it checks whether a record for tomorrow already exists:
+Each night at 9 PM BST (weekdays only), the cron Lambda runs the `CREATE_RECORDS` job. It fetches all active users from the `ACTIVE_USERS` sentinel and tomorrow's published schedule. For each active user:
 
-- If no record exists, one is created using the schedule's meal settings. If a company-wide WFH period covers tomorrow, the record is marked as WFH.
-- If a record already exists (the employee submitted choices earlier), only fields that are still unset are filled in. Any choice the employee already confirmed is left untouched.
+- If no record exists for tomorrow: a record is created using the schedule's meal settings. If a company-wide WFH period covers tomorrow, the record is marked as WFH.
+- If a record already exists: only fields that are still `null` are filled in. Any choice the employee already confirmed is left untouched.
 
+Each morning at 9 AM BST (weekdays only), the cron Lambda runs the `SEND_REPORT` job. It batch-fetches today's records for all active users, aggregates the counts, and posts the headcount summary to the Discord channel via webhook.
+
+---
+
+## Discord Commands
+
+| Command | Role | Visibility | Description |
+|---------|------|------------|-------------|
+| `/my-schedule` | All | Ephemeral | View 7-weekday meal schedule and current choices |
+| `/create-meal` | All | Ephemeral | Create meal choices and WFH for a date |
+| `/update-meal` | All | Ephemeral | Update meal choices and WFH for a date |
+| `/create-schedule` | ADMIN | Public | Set meal options for a weekday date |
+| `/list-schedules` | ADMIN | Ephemeral | View upcoming schedules |
+| `/update-schedule` | ADMIN | Ephemeral | Update meal options for a date |
+| `/delete-schedule` | ADMIN | Ephemeral | Remove a date's schedule |
+| `/set-wfh-period` | ADMIN | Public | Create a company-wide WFH date range |
+| `/list-wfh-periods` | ADMIN | Ephemeral | View active WFH periods |
+| `/update-wfh-period` | ADMIN | Ephemeral | Update a WFH period's date range or note |
+| `/delete-wfh-period` | ADMIN | Ephemeral | Remove a WFH period |
+| `/headcount` | ADMIN, LOGISTICS | Public | Daily meal totals and team breakdown |
+| `/participation` | ADMIN, LEAD | Ephemeral | Per-employee meal detail for a date |
+| `/team-members` | LEAD | Ephemeral | View own team participation |
+| `/employee-schedule` | LEAD | Ephemeral | View a team member's 7-weekday schedule |
+| `/create-employee-meal` | ADMIN, LEAD | Ephemeral | Create an employee's record |
+| `/update-employee-meal` | ADMIN, LEAD | Ephemeral | Override an employee's record |
+| `/bulk-update` | ADMIN, LEAD | Ephemeral | Apply one action to all team members |
+
+Public responses (`/create-schedule`, `/set-wfh-period`, `/headcount`) post embeds visible to the channel. All others are ephemeral.
 
 ---
 
@@ -355,37 +410,51 @@ No API endpoints for user CRUD. The admin maintains two YAML files:
 - `scripts/data/users.yaml` — name, email, discordId, role, status, teamId
 - `scripts/data/teams.yaml` — teamId, name, leadId
 
-`npm run users:sync` diffs the YAML against DynamoDB and:
-- Creates or updates UserProfile items in `mealPlanner`
-- Maintains the `SYSTEM/ACTIVE_USERS` sentinel item (ADD active userIds, DELETE inactive)
-- Maintains `memberIds` StringSet on each `TeamItem` in `teams`
-- Deactivates users who are removed from the YAML (status → INACTIVE)
+`npm run users:sync`:
+- Creates or updates UserProfile items (`USER#{discordId}/PROFILE`)
+- Maintains the `SYSTEM/ACTIVE_USERS` sentinel (ADD active discordIds, DELETE inactive)
+- Maintains `memberIds` StringSet on each `TEAM#{teamId}/METADATA` item
+- Deactivates users removed from YAML (status → INACTIVE)
+
+`npm run teams:sync`:
+- Creates or updates Team items (`TEAM#{teamId}/METADATA`)
+- Maintains the `SYSTEM/ALL_TEAMS` sentinel
 
 ---
 
-## Cron Job
+## Cron Jobs
 
-`cronLambda.ts` exports the Lambda handler. Triggered by EventBridge Scheduler at `cron(0 15 * * ? *)` UTC = 9 PM BST
+`cronLambda.ts` exports the Lambda handler. Dispatched by `event.type`. Both jobs skip execution on Saturday and Sunday.
 
-Logic:
-1. `GetItem` `mealPlanner` `PK=SYSTEM SK=ACTIVE_USERS` — get `memberIds` StringSet of all active discordIds.
-2. `BatchGetItem` all `{discordId} PROFILE` items for those discordIds.
-3. `GetItem` `mealSchedules` `PK=tomorrow` — may return null.
-4. `Query` `globalWfhPeriods` `pk='WFH'` — get all WFH periods, filter for overlap with tomorrow.
-5. For each active user:
-   - If no `RECORD#{tomorrow}` exists: `PutItem` with schedule defaults; `workFromHome=true` if a global WFH period covers tomorrow.
-   - If a record exists: `UpdateItem` only setting meal fields whose current value is `null` — fields already set to `true` or `false` by the user are left unchanged.
+### CREATE_RECORDS — Evening (9 PM BST)
 
+Triggered by EventBridge with `{ "type": "CREATE_RECORDS" }`.
+
+1. GetItem `SYSTEM/ACTIVE_USERS` — get `memberIds` StringSet.
+2. GetItem `SCHEDULE#{tomorrow}/METADATA` — may return null.
+3. Query `PK=WFHPERIOD` — get all WFH periods; filter for overlap with tomorrow.
+4. For each active user:
+   - If no `RECORD#{tomorrow}` exists: PutItem with schedule defaults; `workFromHome=true` if a WFH period covers tomorrow.
+   - If a record exists: only null meal fields are filled in — confirmed choices are never overwritten.
+5. BatchWriteItem in chunks of 25.
+
+### SEND_REPORT — Morning (9 AM BST)
+
+Triggered by EventBridge with `{ "type": "SEND_REPORT" }`.
+
+1. GetItem `SYSTEM/ACTIVE_USERS` — get `memberIds` StringSet.
+2. BatchGetItem `USER#{discordId}/RECORD#{today}` for each active user.
+3. Aggregate totals per meal type and group by team.
+4. POST formatted message to `HEADCOUNT_WEBHOOK_URL` (Discord webhook — no bot token required).
 
 ---
 
-
-### Definition of Done
-- `/health` returns `200 OK` from the Express server.
-- All 4 tables provisioned; `mealPlanner` has exactly 1 GSI; `teams` and `globalWfhPeriods` have none.
-- Discord bot comes online and responds to slash commands with ephemeral replies.
-- curl tests against `localhost:3000` pass for each implemented feature.
-- DynamoDB items verified via AWS CLI after each write operation.
+## Definition of Done
+- `/health` returns `200 OK` from the deployed Lambda.
+- Single DynamoDB table provisioned with 0 GSIs; sentinel items present after sync scripts.
+- Discord bot registers slash commands and responds correctly in the Discord server.
+- All implemented commands verified end-to-end via Discord.
+- DynamoDB items verified via AWS console after each write operation.
 
 ---
 
@@ -393,9 +462,9 @@ Logic:
 
 No automated test suite this iteration. Testing is manual:
 
-- **Backend:** `curl` the interactions endpoint with a valid Ed25519-signed body and send a raw JSON interaction payload with the correct `type`, `member`, and `data` fields.
-- **DynamoDB:** `aws dynamodb` CLI commands to inspect item state after each write operation.
-- **Discord commands:** Run `npm run deploy` in `discord-bot/` once to register slash commands, then invoke them in the Discord server and verify ephemeral replies.  
-- **Cron:** `tsx src/jobs/dailyRecordCreation.ts` directly, then verify tomorrow's records appear in DynamoDB.
+- **Backend:** Run locally with `npm run dev`; use ngrok to expose the interactions endpoint to Discord for live command testing.
+- **DynamoDB:** AWS console to inspect item state after each write operation.
+- **Discord commands:** Run `npm run deploy` in `discord-bot/` once to register slash commands, then invoke them in the Discord server and verify replies.
+- **Cron:** Invoke the cron Lambda directly from the AWS console with `{ "type": "CREATE_RECORDS" }` or `{ "type": "SEND_REPORT" }` as the test event, then verify results in DynamoDB and Discord.
 
 ---
