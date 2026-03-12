@@ -52,8 +52,8 @@ export interface MealRecordItem {
 }
 
 export interface MealScheduleItem {
-  PK:                    string        // SCHEDULE#{date}
-  SK:                    'METADATA'
+  PK:                    'SCHEDULE'
+  SK:                    string        // {YYYY-MM-DD}
   date:                  string        // YYYY-MM-DD
   lunchEnabled:          boolean
   snacksEnabled:         boolean
@@ -67,8 +67,8 @@ export interface MealScheduleItem {
 }
 
 export interface TeamItem {
-  PK:        string        // TEAM#{teamId}
-  SK:        'METADATA'
+  PK:        'TEAM'
+  SK:        string        // {teamId}
   teamId:    string
   name:      string
   leadId:    string        // discordId of team lead
@@ -90,25 +90,11 @@ export interface WfhPeriodItem {
 
 // ── System sentinel items (PK: SYSTEM) ───────────────────────────────────
 
-export interface SystemSentinelItem {
+export interface ActiveUsersItem {
   PK:        'SYSTEM'
-  SK:        'ACTIVE_USERS' | 'ALL_TEAMS' | 'UPCOMING_SCHEDULES'
-  updatedAt: string
-}
-
-export interface ActiveUsersItem extends SystemSentinelItem {
   SK:        'ACTIVE_USERS'
   memberIds: Set<string>   // StringSet of active discordIds
-}
-
-export interface AllTeamsItem extends SystemSentinelItem {
-  SK:      'ALL_TEAMS'
-  teamIds: Set<string>     // StringSet of all teamIds
-}
-
-export interface UpcomingSchedulesItem extends SystemSentinelItem {
-  SK:             'UPCOMING_SCHEDULES'
-  scheduleDates:  Set<string>  // StringSet of YYYY-MM-DD dates with a published schedule
+  updatedAt: string
 }
 
 // ── Audit log item ────────────────────────────────────────────────────────
