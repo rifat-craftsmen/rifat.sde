@@ -1,7 +1,7 @@
 ## DynamoDB Single Table Design — Access Patterns & Schema
 
 **Table name:** `mealPlanner`
-**GSIs:** 0 (zero — all access patterns served via primary keys and sentinel items)
+**GSIs:** 1 — `status-email-index` (GSI PK: `status`, GSI SK: `email`) on UserProfile items
 
 ---
 
@@ -19,6 +19,12 @@
 
 3. **Batch get multiple user profiles**
    BatchGetItem with multiple `PK: USER#{discordId}` `SK: PROFILE`
+
+4. **Get all active users**
+   Query `GSI: status-email-index` `PK: ACTIVE` → returns all active UserProfile items directly
+
+5. **Lookup discordId by email (Google Chat identity resolution)**
+   Query `GSI: status-email-index` `PK: ACTIVE` `SK: {email}` → returns matching UserProfile item
 
 #### DB Schema
 
@@ -38,10 +44,15 @@
 - `createdAt` (String) — ISO 8601 timestamp
 - `updatedAt` (String) — ISO 8601 timestamp
 
+**GSI:** `status-email-index`
+- GSI PK: `status` (ACTIVE | INACTIVE)
+- GSI SK: `email`
+- Enables: get all active users (Query GSI PK=ACTIVE) and lookup by email (Query GSI PK=ACTIVE SK=email)
+
 **Schema Conventions:**
 - `USER#` prefix identifies user partition
-- Discord ID is the sole primary identifier — no internal userId concept
-- Direct GetItem access; no GSI needed
+- Discord ID is the primary identifier
+- Direct GetItem access by discordId; email lookup via `status-email-index` GSI
 
 ---
 
@@ -60,13 +71,14 @@
    PutItem / UpdateItem `PK: USER#{discordId}` `SK: RECORD#{YYYY-MM-DD}`
 
 4. **Get all meal records for a specific date (headcount)**
-   GetItem `PK: SYSTEM` `SK: ACTIVE_USERS` → get all discordIds
+   Query `GSI: status-email-index` `PK: ACTIVE` → get all active user discordIds
    BatchGetItem `PK: USER#{discordId}` `SK: RECORD#{date}` for each active user
 
 5. **Batch create meal records (nightly cron job)**
+   Query `GSI: status-email-index` `PK: ACTIVE` → get all active user discordIds
    BatchWriteItem with multiple `PK: USER#{discordId}` `SK: RECORD#{YYYY-MM-DD}`
 
-6. **Get team members' meal records for a specific date (work location view)**
+6. **Get team members' meal records for a specific date**
    GetItem `PK: TEAM` `SK: {teamId}` → get memberIds
    BatchGetItem `PK: USER#{discordId}` `SK: RECORD#{date}` for each member
 
@@ -138,30 +150,6 @@
 
 ---
 
-### 4. System Sentinel
-
-The single sentinel lives under `PK: SYSTEM`. It acts as a pre-built index to avoid a full table scan for the active user list.
-
-#### Active Users
-
-**Access Patterns:**
-
-1. **Get all active Discord IDs (cron, headcount)**
-   GetItem `PK: SYSTEM` `SK: ACTIVE_USERS`
-
-2. **Add/remove user from active list**
-   UpdateItem `PK: SYSTEM` `SK: ACTIVE_USERS` ADD/DELETE `memberIds :discordId`
-
-**PK:** `SYSTEM`
-**SK:** `ACTIVE_USERS`
-
-**Attributes:**
-- `memberIds` (StringSet) — Set of active user Discord IDs
-- `updatedAt` (String) — ISO 8601 timestamp
-
-**Why sentinel and not a flat partition?**
-User profiles use `PK: USER#{discordId}` — they cannot be grouped under a single `PK: USER` partition without conflicting with the meal record range query pattern (`SK BETWEEN RECORD#...`). A flat partition for active users would also return N items on Query vs a single GetItem for the StringSet. 
-
 ---
 
 ### 5. Team
@@ -178,7 +166,7 @@ User profiles use `PK: USER#{discordId}` — they cannot be grouped under a sing
    Query `PK: TEAM` → returns all team items directly
 
 4. **Get all users grouped by team**
-   GetItem `PK: SYSTEM` `SK: ACTIVE_USERS` → BatchGetItem all `PK: USER#{discordId}` `SK: PROFILE` → group by `teamId` in application
+   Query `GSI: status-email-index` `PK: ACTIVE` → returns all active UserProfile items → group by `teamId` in application
 
 5. **Update team membership (add/remove members)**
    UpdateItem `PK: TEAM` `SK: {teamId}` ADD/DELETE `memberIds :discordId`
@@ -283,38 +271,27 @@ User profiles use `PK: USER#{discordId}` — they cannot be grouped under a sing
 - `AUDIT#` prefix + entity type + entity ID groups all changes to one entity
 - `{timestamp}#{uuid}` SK ensures chronological ordering and uniqueness
 - Timestamp + UUID in SK: query descending for newest-first
-- GSI fields (`gsi1pk`, `gsi2pk`) are intentionally omitted — add when audit viewer command is built
 
 ---
 
 
 ## Key Design Principles
 
-### Zero GSI Design
+### GSI Design
 
-All access patterns are served by primary key lookups, range queries, and the sentinel pattern.
-No GSIs are defined on this table.
+One GSI is defined: `status-email-index` (GSI PK: `status`, GSI SK: `email`) on UserProfile items.
+All other access patterns are served by primary key lookups and range queries — no additional GSIs needed.
 
 | Pattern | Technique |
 |---|---|
 | Single entity lookup | GetItem by PK + SK |
 | User's meal records (7 weekdays) | Query by PK, SK range |
-| Headcount for a date | ACTIVE_USERS sentinel → BatchGetItem |
+| All active users (cron, headcount) | Query `status-email-index` PK=ACTIVE |
+| Email → discordId lookup (Google Chat) | Query `status-email-index` PK=ACTIVE SK=email |
 | List all teams | Query `PK=TEAM` |
 | List upcoming schedules | Query `PK=SCHEDULE SK >= today` |
 | WFH periods sorted by date | Query WFHPERIOD partition (dateFrom in SK) |
 | Team members' records | TEAM item memberIds → BatchGetItem |
-
-### Sentinel Pattern
-
-One sentinel item remains under the `SYSTEM` partition.
-
-| SK | Purpose |
-|---|---|
-| `ACTIVE_USERS` | All active user Discord IDs → used by cron and headcount |
-
-
-**Rule:** Every write that affects the ACTIVE_USERS sentinel (user activated/deactivated) must also update the sentinel item.
 
 ### Partition Key Conventions
 
@@ -325,7 +302,6 @@ One sentinel item remains under the `SYSTEM` partition.
 | `TEAM` | All team items (SK = teamId) |
 | `WFHPERIOD` | All WFH period entries |
 | `AUDIT#{entityType}#{entityId}` | Audit log entries for one entity |
-| `SYSTEM` | System-wide sentinel (ACTIVE_USERS) |
 
 ### Sort Key Conventions
 
@@ -354,6 +330,8 @@ One sentinel item remains under the `SYSTEM` partition.
 | 1   | Get user profile by Discord ID             | `PK = USER#{discordId}` + `SK = PROFILE`                                       |
 | 2   | Update user's WFH counter for the month    | UpdateItem `PK = USER#{discordId}` + `SK = PROFILE`                            |
 | 3   | Batch get multiple user profiles           | BatchGetItem with multiple `PK = USER#{discordId}` + `SK = PROFILE`            |
+| 4   | Get all active users                       | Query `GSI: status-email-index` + `GSI PK = ACTIVE`                            |
+| 5   | Lookup discordId by email (Google Chat)         | Query `GSI: status-email-index` + `GSI PK = ACTIVE` + `GSI SK = {email}`      |
 
 ---
 
@@ -364,8 +342,8 @@ One sentinel item remains under the `SYSTEM` partition.
 | 4   | Get user's single meal record for a specific date      | `PK = USER#{discordId}` + `SK = RECORD#{YYYY-MM-DD}`                                                                             |
 | 5   | Get user's next 7 weekday meal records                 | Query `PK = USER#{discordId}` + `SK BETWEEN RECORD#{startDate} AND RECORD#{endDate}`                                            |
 | 6   | Create or update meal record for a user                | PutItem/UpdateItem `PK = USER#{discordId}` + `SK = RECORD#{YYYY-MM-DD}`                                                          |
-| 7   | Get all meal records for a specific date (headcount)   | GetItem `PK = SYSTEM` + `SK = ACTIVE_USERS` → BatchGetItem `PK = USER#{discordId}` + `SK = RECORD#{date}` for each active user |
-| 8   | Batch create meal records (nightly cron job)           | BatchWriteItem with multiple `PK = USER#{discordId}` + `SK = RECORD#{YYYY-MM-DD}`                                               |
+| 7   | Get all meal records for a specific date (headcount)   | Query `GSI: status-email-index` `PK=ACTIVE` → BatchGetItem `PK = USER#{discordId}` + `SK = RECORD#{date}` for each            |
+| 8   | Batch create meal records (nightly cron job)           | Query `GSI: status-email-index` `PK=ACTIVE` → BatchWriteItem `PK = USER#{discordId}` + `SK = RECORD#{YYYY-MM-DD}`             |
 | 9   | Get team members' meal records for a specific date     | GetItem `PK = TEAM` + `SK = {teamId}` → BatchGetItem `PK = USER#{discordId}` + `SK = RECORD#{date}` for each member            |
 
 ---
@@ -382,15 +360,6 @@ One sentinel item remains under the `SYSTEM` partition.
 
 ---
 
-### System Sentinel
-
-| #   | Pattern                                      | Key Condition                                                            |
-| :-- | :------------------------------------------- | :----------------------------------------------------------------------- |
-| 15  | Get all active Discord IDs (cron, headcount) | GetItem `PK = SYSTEM` + `SK = ACTIVE_USERS`                              |
-| 16  | Add/remove user from active list             | UpdateItem `PK = SYSTEM` + `SK = ACTIVE_USERS` ADD/DELETE memberIds      |
-
----
-
 ### Team
 
 | #   | Pattern                              | Key Condition                                                                                                                                  |
@@ -398,7 +367,7 @@ One sentinel item remains under the `SYSTEM` partition.
 | 17  | Get team details and member list     | GetItem `PK = TEAM` + `SK = {teamId}`                                                                                                          |
 | 18  | Get all team member profiles         | GetItem `PK = TEAM` + `SK = {teamId}` → BatchGetItem `PK = USER#{discordId}` + `SK = PROFILE` for each member                                 |
 | 19  | Get all teams with details           | Query `PK = TEAM`                                                                                                                              |
-| 20  | Get all users grouped by team        | GetItem `PK = SYSTEM` + `SK = ACTIVE_USERS` → BatchGetItem `PK = USER#{discordId}` + `SK = PROFILE` for all → group by teamId in app          |
+| 20  | Get all users grouped by team        | Query `GSI: status-email-index` `PK=ACTIVE` → all active UserProfile items → group by teamId in app                                           |
 | 21  | Update team membership               | UpdateItem `PK = TEAM` + `SK = {teamId}` ADD/DELETE memberIds                                                                                  |
 
 ---
