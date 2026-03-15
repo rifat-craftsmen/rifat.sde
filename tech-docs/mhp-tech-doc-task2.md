@@ -102,7 +102,7 @@ This document introduces a discord based Meal Headcount Planner system. Employee
 | Lambda adapter | `@vendia/serverless-express` | Wraps Express for Lambda with zero code changes to the app itself |
 | Deployment | AWS Lambda Function URL | No API Gateway cost (~$3.50/M requests) or configuration; direct HTTPS URL for a single known client |
 | Database | Amazon DynamoDB | Serverless, PAY_PER_REQUEST billing |
-| Local DB | DynamoDB Local via Docker | Identical API to AWS; fake AWS credentials must still be present in `.env` (`AWS\_ACCESS\_KEY\_ID=local`, `AWS\_SECRET\_ACCESS\_KEY=local`) |
+| Local DB | DynamoDB Local via Docker | Identical API to AWS; fake AWS credentials must still be present in `.env` (`AWS_ACCESS_KEY_ID=local`, `AWS_SECRET_ACCESS_KEY=local`) |
 | Build | esbuild | Bundles TypeScript + dependencies to a single ~3–5 MB file; `--external:@aws-sdk` excludes the SDK already present in Lambda runtime, reducing upload from ~150 MB to ~5 MB |
 
 ---
@@ -113,61 +113,36 @@ This document introduces a discord based Meal Headcount Planner system. Employee
 Discord uses the **Interactions Endpoint** model instead of a WebSocket gateway. When a user runs a slash command, Discord sends a POST to the configured Lambda Function URL. No always-on process is needed.
 
 ```
-
 Discord User
-
- │  slash command
-
- ▼
-
+  │  slash command
+  ▼
 Discord
-
- │  POST /discord/interactions  (Ed25519 signed)
-
- ▼
-
+  │  POST /discord/interactions  (Ed25519 signed)
+  ▼
 API Lambda
-
- │  [1] verify Ed25519 signature        
-
- │  [2] resolve discordId → userId       
-
- │  [3] map Discord role IDs → app role 
-
- │  [4] check command role requirement for authorization 
-
- │  [5] execute command handler          
-
- ▼
-
+  │  [1] verify Ed25519 signature        
+  │  [2] resolve discordId → userId       
+  │  [3] read app role from DynamoDB user record
+  │  [4] check command role requirement for authorization 
+  │  [5] execute command handler          
+  ▼
 Discord  (delivers interaction response to user)
-
-
 
 ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
 
-
-
 EventBridge Scheduler  (9 PM BST)
-
- │  invoke
-
- ▼
-
+  │  invoke
+  ▼
 Cron Lambda
-
- │  BatchWrite
-
- ▼
-
+  │  BatchWrite
+  ▼
 DynamoDB
-
 ```
 
 
 
 
-Two independently deployable Lambda functions. No persistent bot process.
+Two independently deployable Lambda functions. No persistent bot process. 
 
 | Component | Runtime | Trigger |
 |-----------|---------|---------|
@@ -200,7 +175,7 @@ Four DynamoDB tables. **2 GSIs total** — both on `mealPlanner`.
 - `lastModifiedBy`
 - `gsi2pk: RECORD#{date}` → date-records-index
 
-**Active User List** — `PK: SYSTEM` · `SK: ACTIVE\_USERS`
+**Active User List** — `PK: SYSTEM` · `SK: ACTIVE_USERS`
 - `memberIds: StringSet` — all active userIds; read by cron each night to avoid a full table scan
 
 **GSIs**
@@ -240,7 +215,7 @@ Four DynamoDB tables. **2 GSIs total** — both on `mealPlanner`.
 | Upsert meal record | PutItem `PK=USER#{userId}`, `SK=RECORD#{date}` |
 | Update WFH counter on profile | UpdateItem `PK=USER#{userId}`, `SK=PROFILE` ADD `wfhCount` |
 | All records for a date (headcount) | Query `date-records-index` (`gsi2pk=RECORD#{date}`) |
-| All active users (cron) | GetItem `PK=SYSTEM`, `SK=ACTIVE\_USERS` → BatchGetItem profiles |
+| All active users (cron) | GetItem `PK=SYSTEM`, `SK=ACTIVE_USERS` → BatchGetItem profiles |
 | **mealSchedules** | |
 | Create schedule | PutItem `PK=date` |
 | Get schedule for a date | GetItem `PK=date` |
@@ -260,28 +235,19 @@ Four DynamoDB tables. **2 GSIs total** — both on `mealPlanner`.
 
 ## Authentication & Authorization
 
-Membership in the organization's Discord server is the identity boundary. No JWT, no session, no login endpoint is used.
+Membership in the organization's Discord server is the identity boundary. No JWT, no session, no login endpoint is used. 
 
 ### Authentication — Ed25519 Signature Verification
 
-Every interaction request from Discord is signed using the application's Ed25519 private key. The `discordVerify` middleware validates this signature against the application's `DISCORD\_PUBLIC\_KEY` before any other processing occurs. Requests with an invalid or missing signature are rejected with `401`. This is Discord's required security mechanism for interactions endpoints — Discord itself deactivates endpoints that fail to validate signatures correctly.
+Every interaction request from Discord is signed using the application's Ed25519 private key. The `discordVerify` middleware validates this signature against the application's `DISCORD_PUBLIC_KEY` before any other processing occurs. Requests with an invalid or missing signature are rejected with `401`. This is Discord's required security mechanism for interactions endpoints — Discord itself deactivates endpoints that fail to validate signatures correctly.
 
 ### Identity Resolution
 
-The interaction payload includes `interaction.member.user.id`, which is the invoking user's Discord snowflake ID. The `discordAuth` middleware queries the `discordId-index` GSI to resolve this snowflake to the internal `userId` and `teamId`, and attaches them to `req.user`. If no matching user is found in DynamoDB, the request is rejected.
+The interaction payload includes `interaction.member.user.id`, which is the invoking user's Discord snowflake ID. The `discordAuth` middleware queries the `discordId-index` GSI to resolve this snowflake to the internal `userId`, `teamId`, and `role`, and attaches them to `req.user`. If no matching user is found, the middleware responds directly with a Discord interaction response (`type: 4`, ephemeral) — not an HTTP error code — so Discord can surface the message to the user instead of showing a generic failure.
 
 ### Role Resolution
 
-The interaction payload includes `interaction.member.roles`, an array of Discord role ID snowflakes assigned to the invoking user. The backend maps these IDs to application roles using environment variables configured at deployment time:
-
-| Env var | App Role | Assigned capabilities |
-|---------|----------|-----------------------|
-| `DISCORD\_ROLE\_ADMIN` | `ADMIN` | All commands |
-| `DISCORD\_ROLE\_LEAD` | `LEAD` | Team views, employee record overrides, bulk updates (own team only) |
-| `DISCORD\_ROLE\_LOGISTICS` | `LOGISTICS` | Headcount and participation views |
-| `DISCORD\_ROLE\_EMPLOYEE` | `EMPLOYEE` | Own schedule and meal updates only |
-
-If a user holds multiple qualifying roles, the highest-privilege role takes precedence (ADMIN > LEAD > LOGISTICS > EMPLOYEE). The resolved role is attached to `req.user.role`.
+The user's application role (`ADMIN`, `LEAD`, `LOGISTICS`, `EMPLOYEE`) is stored on their DynamoDB user record and is the single source of truth. After resolving the user profile via the `discordId-index` GSI, `discordAuth` reads `user.role` directly from the returned item and attaches it to `req.user.role`. No mapping from Discord guild role IDs is performed at runtime.
 
 ### Authorization
 
@@ -371,7 +337,7 @@ Three npm scripts manage the sync:
 | Script | What it does |
 |--------|-------------|
 | `npm run teams:sync` | PutItem each team into `teams` — `memberIds` is omitted here so re-running never wipes existing membership |
-| `npm run users:sync` | PutItem each user PROFILE into `mealPlanner`; ADD/DELETE `memberIds` on the team based on `status`; upserts `SYSTEM/ACTIVE\_USERS` sentinel |
+| `npm run users:sync` | PutItem each user PROFILE into `mealPlanner`; ADD/DELETE `memberIds` on the team based on `status`; upserts `SYSTEM/ACTIVE_USERS` sentinel |
 | `npm run sync` | Runs both in order (teams first, then users) |
 
 The sync is a full upsert — it does not diff against existing DynamoDB state. Users removed from the YAML are not automatically deactivated; they must be explicitly set to `status: INACTIVE` in `users.yaml` and the sync re-run.
@@ -380,16 +346,16 @@ The sync is a full upsert — it does not diff against existing DynamoDB state. 
 
 ## Cron Job
 
-`cronLambda.ts` exports the Lambda handler. Triggered by EventBridge Scheduler at `cron(0 15 \* \* ? \*)` UTC = 9 PM BST
+`cronLambda.ts` exports the Lambda handler. Triggered by EventBridge Scheduler at `cron(0 15 * * ? *)` UTC = 9 PM BST
 
 Logic:
-1. `GetItem` `mealPlanner` `PK=SYSTEM SK=ACTIVE\_USERS` — get `memberIds` StringSet of all active users.
+1. `GetItem` `mealPlanner` `PK=SYSTEM SK=ACTIVE_USERS` — get `memberIds` StringSet of all active users.
 2. `BatchGetItem` all `USER#{id} PROFILE` items for those userIds.
 3. `GetItem` `mealSchedules` `PK=tomorrow` — may return null.
 4. `Query` `globalWfhPeriods` `pk='WFH'` — get all WFH periods, filter for overlap with tomorrow.
 5. For each active user:
-   - If no `RECORD#{tomorrow}` exists: `PutItem` with schedule defaults; `workFromHome=true` if a global WFH period covers tomorrow.
-   - If a record exists: `UpdateItem` only setting meal fields whose current value is `null` — fields already set to `true` or `false` by the user are left unchanged.
+   - If no `RECORD#{tomorrow}` exists: `PutItem` with schedule defaults; `workFromHome=true` if a global WFH period covers tomorrow.
+   - If a record exists: `UpdateItem` only setting meal fields whose current value is `null` — fields already set to `true` or `false` by the user are left unchanged.
 
 
 ---
@@ -410,7 +376,7 @@ No automated test suite this iteration. Testing is manual:
 
 - **Backend:** `curl` the interactions endpoint with a valid Ed25519-signed body and send a raw JSON interaction payload with the correct `type`, `member`, and `data` fields.
 - **DynamoDB:** `aws dynamodb` CLI commands against `--endpoint-url http://localhost:8000` to inspect item state after each operation.
-- **Discord commands:** Run `npm run deploy` in `discord-bot/` once to register slash commands, then invoke them in the Discord server and verify ephemeral replies.
+- **Discord commands:** Run `npm run deploy` in `discord-bot/` once to register slash commands, then invoke them in the Discord server and verify ephemeral replies.  
 - **Cron:** `tsx src/jobs/dailyRecordCreation.ts` directly, then verify tomorrow's records appear in DynamoDB.
 
 ---
