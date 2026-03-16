@@ -88,15 +88,6 @@ export interface WfhPeriodItem {
   updatedAt: string
 }
 
-// ── System sentinel items (PK: SYSTEM) ───────────────────────────────────
-
-export interface ActiveUsersItem {
-  PK:        'SYSTEM'
-  SK:        'ACTIVE_USERS'
-  memberIds: Set<string>   // StringSet of active discordIds
-  updatedAt: string
-}
-
 // ── Audit log item ────────────────────────────────────────────────────────
 
 export interface AuditLogItem {

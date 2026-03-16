@@ -6,9 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build:api": "esbuild src/lambda.ts --bundle --platform=node --target=node18 --external:@aws-sdk --outfile=dist/lambda.js",
+    "build:discord": "esbuild src/lambda.ts --bundle --platform=node --target=node22 --external:@aws-sdk --outfile=dist/discordLambda.js",
     "build:cron": "esbuild src/jobs/cronLambda.ts --bundle --platform=node --target=node18 --external:@aws-sdk --outfile=dist/cron.js",
-    "build": "npm run build:api && npm run build:cron",
+    "build:google": "esbuild src/googleLambda.ts --bundle --platform=node --target=node18 --external:@aws-sdk --outfile=dist/googleLambda.js",
+    "build:discord-authorizer": "esbuild src/authorizers/discordAuthorizer.ts --bundle --platform=node --target=node18 --external:@aws-sdk --outfile=dist/discordAuthorizer.js",
+    "build:google-authorizer": "esbuild src/authorizers/googleAuthorizer.ts --bundle --platform=node --target=node18 --external:@aws-sdk --outfile=dist/googleAuthorizer.js",
+    "build": "npm run build:discord && npm run build:cron && npm run build:google && npm run build:discord-authorizer && npm run build:google-authorizer",
     "tables:create": "tsx scripts/createTables.ts",
     "teams:sync": "tsx scripts/syncTeams.ts",
     "users:sync": "tsx scripts/syncUsers.ts",
@@ -27,6 +30,7 @@
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
     "express-validator": "^7.3.1",
+    "google-auth-library": "^10.6.1",
     "yaml": "^2.8.2"
   },
   "devDependencies": {

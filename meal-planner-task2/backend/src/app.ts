@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express'
 import cors from 'cors'
 import { discordRouter } from './routes/discordRoutes.js'
+import { googleRouter }  from './routes/googleRoutes.js'
 
 export const app = express()
 
@@ -11,6 +12,7 @@ app.use(cors({
 // Discord interactions route must be mounted before express.json() because
 // Ed25519 signature verification requires the raw request body (Buffer).
 app.use('/discord', discordRouter)
+app.use('/google',  googleRouter)
 
 app.use(express.json())
 
