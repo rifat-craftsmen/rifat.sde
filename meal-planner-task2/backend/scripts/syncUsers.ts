@@ -47,7 +47,6 @@ async function syncUsers() {
 
   const now      = new Date().toISOString()
   const wfhMonth = getCurrentMonthKey()
-  const activeDiscordIds: string[] = []
 
   for (const user of users) {
     const teamName = user.teamId ? (teamMap.get(user.teamId) ?? undefined) : undefined
@@ -93,21 +92,6 @@ async function syncUsers() {
       }
     }
 
-    if (user.status === 'ACTIVE') activeDiscordIds.push(user.discordId)
-  }
-
-  // ── Upsert SYSTEM/ACTIVE_USERS sentinel ───────────────────────────────────
-  if (activeDiscordIds.length > 0) {
-    await dynamo.send(new PutCommand({
-      TableName: TABLES.MAIN,
-      Item: {
-        PK:        'SYSTEM',
-        SK:        'ACTIVE_USERS',
-        memberIds: new Set(activeDiscordIds),
-        updatedAt: new Date().toISOString(),
-      },
-    }))
-    console.log(`\n  ✓ SYSTEM/ACTIVE_USERS updated  (${activeDiscordIds.length} active users)`)
   }
 
   console.log('\nDone.\n')
