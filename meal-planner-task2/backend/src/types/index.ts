@@ -97,6 +97,16 @@ export interface SystemActiveUsersItem {
   memberIds: Set<string>   // StringSet of userId values
 }
 
+// ── Service return types ──────────────────────────────────────────────────
+
+export interface ScheduleDay {
+  date:      string
+  isToday:   boolean
+  globalWFH: boolean
+  schedule:  MealScheduleItem | null
+  record:    MealRecordItem | null
+}
+
 // ── Request payload shapes (from Discord interactions) ────────────────────
 
 export interface MealUpdateData {
