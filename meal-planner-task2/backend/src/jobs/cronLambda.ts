@@ -1,12 +1,12 @@
 import 'dotenv/config'
-import { GetCommand, BatchGetCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb'
+import { QueryCommand, BatchGetCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import {
   getTomorrowString,
   isWeekend,
 } from '../utils/dateHelpers.js'
 import { writeAuditLog } from '../services/auditService.js'
-import type { ActiveUsersItem, MealRecordItem } from '../types/index.js'
+import type { UserItem, MealRecordItem } from '../types/index.js'
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -41,18 +41,21 @@ async function createRecords(): Promise<void> {
     return
   }
 
-  // Get all active user Discord IDs from sentinel
-  const sentinelResult = await dynamo.send(new GetCommand({
-    TableName: TABLES.MAIN,
-    Key: { PK: 'SYSTEM', SK: 'ACTIVE_USERS' },
+  // Get all active users via GSI (replaces ACTIVE_USERS sentinel)
+  const gsiResult = await dynamo.send(new QueryCommand({
+    TableName:                 TABLES.MAIN,
+    IndexName:                 'status-email-index',
+    KeyConditionExpression:    '#status = :active',
+    ExpressionAttributeNames:  { '#status': 'status' },
+    ExpressionAttributeValues: { ':active': 'ACTIVE' },
   }))
-  const sentinel = sentinelResult.Item as ActiveUsersItem | undefined
-  if (!sentinel?.memberIds?.size) {
+  const activeUsers = (gsiResult.Items ?? []) as UserItem[]
+  if (!activeUsers.length) {
     console.log('No active users found.')
     return
   }
 
-  const discordIds = [...sentinel.memberIds]
+  const discordIds = activeUsers.map(u => u.discordId)
   console.log(`Creating records for ${discordIds.length} users on ${date}`)
 
   // BatchWrite in chunks of 25 (DynamoDB limit)
@@ -103,9 +106,9 @@ async function createRecords(): Promise<void> {
  * and posts a report to the configured Discord channel.
  */
 async function sendHeadcountReport(): Promise<void> {
-  const webhookUrl = process.env.HEADCOUNT_WEBHOOK_URL
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL
   if (!webhookUrl) {
-    console.error('HEADCOUNT_WEBHOOK_URL not set — skipping report.')
+    console.error('DISCORD_WEBHOOK_URL not set — skipping report.')
     return
   }
 
@@ -113,18 +116,21 @@ async function sendHeadcountReport(): Promise<void> {
   const today = new Date()
   const date  = today.toISOString().slice(0, 10)
 
-  // Get all active user Discord IDs
-  const sentinelResult = await dynamo.send(new GetCommand({
-    TableName: TABLES.MAIN,
-    Key: { PK: 'SYSTEM', SK: 'ACTIVE_USERS' },
+  // Get all active users via GSI
+  const gsiResult = await dynamo.send(new QueryCommand({
+    TableName:                 TABLES.MAIN,
+    IndexName:                 'status-email-index',
+    KeyConditionExpression:    '#status = :active',
+    ExpressionAttributeNames:  { '#status': 'status' },
+    ExpressionAttributeValues: { ':active': 'ACTIVE' },
   }))
-  const sentinel = sentinelResult.Item as ActiveUsersItem | undefined
-  if (!sentinel?.memberIds?.size) {
+  const activeUsers = (gsiResult.Items ?? []) as UserItem[]
+  if (!activeUsers.length) {
     console.log('No active users — skipping report.')
     return
   }
 
-  const discordIds = [...sentinel.memberIds]
+  const discordIds = activeUsers.map(u => u.discordId)
 
   // BatchGet today's meal records for all active users (chunks of 100)
   const records: MealRecordItem[] = []

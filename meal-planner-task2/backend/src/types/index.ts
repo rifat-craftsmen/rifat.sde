@@ -13,6 +13,7 @@ export interface AuthRequest extends Request {
     discordId: string
     role:      Role
     teamId?:   string
+    platform:  'discord' | 'google'
   }
 }
 
@@ -85,15 +86,6 @@ export interface WfhPeriodItem {
   dateTo:    string        // YYYY-MM-DD
   note?:     string
   createdAt: string
-  updatedAt: string
-}
-
-// ── System sentinel items (PK: SYSTEM) ───────────────────────────────────
-
-export interface ActiveUsersItem {
-  PK:        'SYSTEM'
-  SK:        'ACTIVE_USERS'
-  memberIds: Set<string>   // StringSet of active discordIds
   updatedAt: string
 }
 

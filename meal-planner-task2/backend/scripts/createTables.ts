@@ -26,8 +26,8 @@ async function main() {
   console.log(`\nProvisioning DynamoDB tables in region: ${process.env.AWS_REGION || 'ap-southeast-1'}\n`)
 
   // ── Single table: mealPlanner ────────────────────────────────────────────
-  // All entities share this table. No GSIs — access via primary keys and
-  // sentinel items (SYSTEM partition).
+  // All entities share this table. 1 GSI (status-email-index) for active user
+  // queries and Google Chat email-based identity lookup.
   //
   // Entity PK/SK patterns:
   //   UserProfile      PK: USER#{discordId}          SK: PROFILE
@@ -36,17 +36,33 @@ async function main() {
   //   Team             PK: TEAM                      SK: {teamId}
   //   WfhPeriod        PK: WFHPERIOD                 SK: {dateFrom}#{uuid}
   //   AuditLog         PK: AUDIT#{entityType}#{id}   SK: {timestamp}#{uuid}
-  //   ACTIVE_USERS     PK: SYSTEM                    SK: ACTIVE_USERS
+  //
+  // GSI: status-email-index
+  //   GSI PK: status (ACTIVE | INACTIVE)   GSI SK: email
+  //   Only UserProfile items are indexed (only entity with both attributes).
+  //   Replaces ACTIVE_USERS sentinel — Query GSI PK=ACTIVE returns all active users.
   await createIfNotExists({
     TableName: MAIN,
     BillingMode: 'PAY_PER_REQUEST',
     AttributeDefinitions: [
-      { AttributeName: 'PK', AttributeType: 'S' },
-      { AttributeName: 'SK', AttributeType: 'S' },
+      { AttributeName: 'PK',     AttributeType: 'S' },
+      { AttributeName: 'SK',     AttributeType: 'S' },
+      { AttributeName: 'status', AttributeType: 'S' },
+      { AttributeName: 'email',  AttributeType: 'S' },
     ],
     KeySchema: [
       { AttributeName: 'PK', KeyType: 'HASH' },
       { AttributeName: 'SK', KeyType: 'RANGE' },
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'status-email-index',
+        KeySchema: [
+          { AttributeName: 'status', KeyType: 'HASH' },
+          { AttributeName: 'email',  KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'ALL' },
+      },
     ],
   })
 

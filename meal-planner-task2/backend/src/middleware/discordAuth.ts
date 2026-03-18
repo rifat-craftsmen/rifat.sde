@@ -4,23 +4,11 @@ import { AuthRequest, Role } from '../types/index.js'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 
 /**
- * Resolves application role from Discord guild role snowflake IDs.
- * Priority: ADMIN > LEAD > LOGISTICS > EMPLOYEE
- * Configured via env vars set at deployment time.
- */
-function resolveRole(discordRoles: string[]): Role {
-  if (process.env.DISCORD_ROLE_ADMIN     && discordRoles.includes(process.env.DISCORD_ROLE_ADMIN))     return 'ADMIN'
-  if (process.env.DISCORD_ROLE_LEAD      && discordRoles.includes(process.env.DISCORD_ROLE_LEAD))      return 'LEAD'
-  if (process.env.DISCORD_ROLE_LOGISTICS && discordRoles.includes(process.env.DISCORD_ROLE_LOGISTICS)) return 'LOGISTICS'
-  return 'EMPLOYEE'
-}
-
-/**
  * Extracts identity from the verified Discord interaction payload.
  * Must run after discordVerify (req.body is already the parsed interaction object).
  *
  * - Looks up user profile via GetItem PK=USER#{discordId}, SK=PROFILE
- * - Role is resolved from Discord guild role IDs (not from DB)
+ * - Role is read directly from the DB profile (single source of truth for both platforms)
  * - Sets req.user = { discordId, role, teamId? }
  */
 export const discordAuth = async (
@@ -28,9 +16,8 @@ export const discordAuth = async (
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
-  const interaction  = req.body
-  const discordId    = interaction?.member?.user?.id as string | undefined
-  const discordRoles = (interaction?.member?.roles ?? []) as string[]
+  const interaction = req.body
+  const discordId   = interaction?.member?.user?.id as string | undefined
 
   if (!discordId) {
     res.json({ type: 4, data: { content: 'Could not identify your Discord user.', flags: 64 } })
@@ -50,8 +37,9 @@ export const discordAuth = async (
 
     req.user = {
       discordId,
-      role:   resolveRole(discordRoles),
-      teamId: result.Item['teamId'] as string | undefined,
+      role:     result.Item['role'] as Role,
+      teamId:   result.Item['teamId'] as string | undefined,
+      platform: 'discord',
     }
     next()
   } catch (err) {
