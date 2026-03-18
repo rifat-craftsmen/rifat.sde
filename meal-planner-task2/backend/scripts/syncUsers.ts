@@ -10,7 +10,6 @@ import type { Role, UserStatus } from '../src/types/index.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 interface UserYaml {
-  userId:    string
   discordId: string
   name:      string
   email:     string
@@ -46,72 +45,69 @@ async function syncUsers() {
 
   console.log(`\nSyncing ${users.length} user(s) → ${TABLES.MAIN}\n`)
 
-  const now          = new Date().toISOString()
-  const wfhMonth     = getCurrentMonthKey()
-  const activeIds: string[] = []
+  const now      = new Date().toISOString()
+  const wfhMonth = getCurrentMonthKey()
+  const activeDiscordIds: string[] = []
 
   for (const user of users) {
     const teamName = user.teamId ? (teamMap.get(user.teamId) ?? undefined) : undefined
 
-    // ── Upsert user PROFILE ────────────────────────────────────────────────
+    // ── Upsert UserProfile ─────────────────────────────────────────────────
     await dynamo.send(new PutCommand({
       TableName: TABLES.MAIN,
       Item: {
-        PK:        `USER#${user.userId}`,
+        PK:        `USER#${user.discordId}`,
         SK:        'PROFILE',
-        userId:    user.userId,
+        discordId: user.discordId,
         name:      user.name,
         email:     user.email,
-        discordId: user.discordId,
         role:      user.role,
         status:    user.status,
-        teamId:    user.teamId   ?? undefined,
-        teamName:  teamName      ?? undefined,
+        teamId:    user.teamId ?? undefined,
+        teamName:  teamName    ?? undefined,
         wfhCount:  0,
         wfhMonth,
-        gsi1pk:    user.discordId,  // discordId-index
         createdAt: now,
         updatedAt: now,
       },
     }))
 
-    console.log(`  ✓ ${user.userId}  ${user.name.padEnd(20)} [${user.role}] [${user.status}]`)
+    console.log(`  ✓ ${user.discordId}  ${user.name.padEnd(20)} [${user.role}] [${user.status}]`)
 
-    // ── Sync team membership ───────────────────────────────────────────────
+    // ── Sync team membership (discordId-based StringSet) ───────────────────
     if (user.teamId) {
       if (user.status === 'ACTIVE') {
         await dynamo.send(new UpdateCommand({
-          TableName:                 TABLES.TEAMS,
-          Key:                       { teamId: user.teamId },
-          UpdateExpression:          'ADD memberIds :uid',
-          ExpressionAttributeValues: { ':uid': new Set([user.userId]) },
+          TableName:                 TABLES.MAIN,
+          Key:                       { PK: 'TEAM', SK: user.teamId },
+          UpdateExpression:          'ADD memberIds :did',
+          ExpressionAttributeValues: { ':did': new Set([user.discordId]) },
         }))
       } else {
-        // Remove inactive users from team so headcounts stay accurate
         await dynamo.send(new UpdateCommand({
-          TableName:                 TABLES.TEAMS,
-          Key:                       { teamId: user.teamId },
-          UpdateExpression:          'DELETE memberIds :uid',
-          ExpressionAttributeValues: { ':uid': new Set([user.userId]) },
+          TableName:                 TABLES.MAIN,
+          Key:                       { PK: 'TEAM', SK: user.teamId },
+          UpdateExpression:          'DELETE memberIds :did',
+          ExpressionAttributeValues: { ':did': new Set([user.discordId]) },
         }))
       }
     }
 
-    if (user.status === 'ACTIVE') activeIds.push(user.userId)
+    if (user.status === 'ACTIVE') activeDiscordIds.push(user.discordId)
   }
 
   // ── Upsert SYSTEM/ACTIVE_USERS sentinel ───────────────────────────────────
-  // Used by the cron Lambda to get all active users without a table scan
-  if (activeIds.length > 0) {
+  if (activeDiscordIds.length > 0) {
     await dynamo.send(new PutCommand({
       TableName: TABLES.MAIN,
       Item: {
         PK:        'SYSTEM',
         SK:        'ACTIVE_USERS',
-        memberIds: new Set(activeIds),
+        memberIds: new Set(activeDiscordIds),
+        updatedAt: new Date().toISOString(),
       },
     }))
-    console.log(`\n  ✓ SYSTEM/ACTIVE_USERS updated  (${activeIds.length} active users)`)
+    console.log(`\n  ✓ SYSTEM/ACTIVE_USERS updated  (${activeDiscordIds.length} active users)`)
   }
 
   console.log('\nDone.\n')

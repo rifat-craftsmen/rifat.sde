@@ -28,10 +28,21 @@ export const discordVerify = (req: Request, res: Response, next: NextFunction): 
     return
   }
 
-  // verifyKey expects the raw body as a string, not Buffer
-  const rawBody = (req.body as Buffer).toString('utf8')
-  const isValid = verifyKey(rawBody, signature, timestamp, publicKey)
+  const body    = req.body as Buffer
+  const rawBody = body.toString('utf8')
+
+  console.log('[discordVerify] headers:', JSON.stringify({
+    signature:  signature?.slice(0, 16) + '...',
+    timestamp,
+    bodyLength: rawBody.length,
+    bodyStart:  rawBody.slice(0, 40),
+    publicKey:  publicKey.slice(0, 16) + '...',
+  }))
+
+  // Pass raw Buffer to verifyKey — avoids any string re-encoding issues
+  const isValid = verifyKey(body, signature, timestamp, publicKey)
   if (!isValid) {
+    console.error('[discordVerify] Signature invalid')
     res.status(401).json({ error: 'Invalid request signature' })
     return
   }

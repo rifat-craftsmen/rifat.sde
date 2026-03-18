@@ -11,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 interface TeamYaml {
   teamId: string
   name:   string
-  leadId: string
+  leadId: string  // discordId of team lead
 }
 
 function loadTeams(): TeamYaml[] {
@@ -21,14 +21,16 @@ function loadTeams(): TeamYaml[] {
 
 async function syncTeams() {
   const teams = loadTeams()
-  console.log(`\nSyncing ${teams.length} team(s) → ${TABLES.TEAMS}\n`)
+  console.log(`\nSyncing ${teams.length} team(s) → ${TABLES.MAIN}\n`)
+
+  const now = new Date().toISOString()
 
   for (const team of teams) {
-    const now = new Date().toISOString()
-
     await dynamo.send(new PutCommand({
-      TableName: TABLES.TEAMS,
+      TableName: TABLES.MAIN,
       Item: {
+        PK:        'TEAM',
+        SK:        team.teamId,
         teamId:    team.teamId,
         name:      team.name,
         leadId:    team.leadId,
@@ -38,7 +40,7 @@ async function syncTeams() {
       },
     }))
 
-    console.log(`  ✓ ${team.teamId}  (${team.name})`)
+    console.log(`  ✓ ${team.teamId}  (${team.name})  lead: ${team.leadId}`)
   }
 
   console.log('\nDone. Run npm run users:sync next to populate team members.\n')
