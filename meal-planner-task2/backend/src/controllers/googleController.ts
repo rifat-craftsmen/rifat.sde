@@ -4,6 +4,7 @@ import { handleMySchedule }     from '../commands/mySchedule.js'
 import { handleCreateSchedule } from '../commands/createSchedule.js'
 import { handleListSchedules }  from '../commands/listSchedules.js'
 import { handleDeleteSchedule } from '../commands/deleteSchedule.js'
+import { handleUpdateSchedule } from '../commands/updateSchedule.js'
 
 /**
  * Entry point for all Google Chat slash commands.
@@ -31,6 +32,7 @@ export const handleGoogleInteraction = async (req: AuthRequest, res: Response): 
       case 'create-schedule': await handleCreateSchedule(req, res); return
       case 'list-schedules':  await handleListSchedules(req, res);  return
       case 'delete-schedule': await handleDeleteSchedule(req, res); return
+      case 'update-schedule': await handleUpdateSchedule(req, res); return
       default:
         res.json({ text: `Unknown command \`/${commandName}\`.` })
     }

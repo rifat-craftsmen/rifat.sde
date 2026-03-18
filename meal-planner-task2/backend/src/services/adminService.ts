@@ -1,8 +1,8 @@
-import { PutCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, GetCommand, UpdateCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import { getTodayString } from '../utils/dateHelpers.js'
 import { writeAuditLog } from './auditService.js'
-import type { CreateScheduleData, MealScheduleItem } from '../types/index.js'
+import type { CreateScheduleData, UpdateScheduleData, MealScheduleItem } from '../types/index.js'
 
 // ── Meal Schedule ─────────────────────────────────────────────────────────────
 
@@ -45,6 +45,65 @@ export async function createMealSchedule(
       optionalDinnerEnabled: { old: null, new: data.optionalDinnerEnabled },
       occasionName:          { old: null, new: data.occasionName ?? null },
     },
+  })
+}
+
+export async function updateMealScheduleWithAudit(
+  date: string,
+  data: UpdateScheduleData,
+  actorDiscordId: string,
+): Promise<void> {
+  const existing = await dynamo.send(new GetCommand({
+    TableName: TABLES.MAIN,
+    Key: { PK: 'SCHEDULE', SK: date },
+  }))
+
+  if (!existing.Item) {
+    throw new Error(`No schedule found for ${date}`)
+  }
+
+  const old = existing.Item as MealScheduleItem
+  const now  = new Date().toISOString()
+
+  const setClauses: string[]                               = ['updatedAt = :updatedAt']
+  const exprValues: Record<string, unknown>                = { ':updatedAt': now }
+  const changes:    Record<string, { old: unknown; new: unknown }> = {}
+
+  const boolFields = [
+    'lunchEnabled',
+    'snacksEnabled',
+    'iftarEnabled',
+    'eventDinnerEnabled',
+    'optionalDinnerEnabled',
+  ] as const
+
+  for (const field of boolFields) {
+    if (data[field] !== undefined) {
+      setClauses.push(`${field} = :${field}`)
+      exprValues[`:${field}`] = data[field]
+      changes[field] = { old: old[field], new: data[field] }
+    }
+  }
+
+  if (data.occasionName !== undefined) {
+    setClauses.push('occasionName = :occasionName')
+    exprValues[':occasionName'] = data.occasionName
+    changes['occasionName'] = { old: old.occasionName ?? null, new: data.occasionName }
+  }
+
+  await dynamo.send(new UpdateCommand({
+    TableName: TABLES.MAIN,
+    Key: { PK: 'SCHEDULE', SK: date },
+    UpdateExpression: `SET ${setClauses.join(', ')}`,
+    ExpressionAttributeValues: exprValues,
+  }))
+
+  await writeAuditLog({
+    actorDiscordId,
+    actorName:  actorDiscordId,
+    action:     'UPDATE',
+    entityType: 'SCHEDULE',
+    entityId:   date,
   })
 }
 

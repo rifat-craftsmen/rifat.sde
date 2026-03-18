@@ -138,6 +138,15 @@ export interface CreateScheduleData {
   occasionName?:         string
 }
 
+export interface UpdateScheduleData {
+  lunchEnabled?:          boolean
+  snacksEnabled?:         boolean
+  iftarEnabled?:          boolean
+  eventDinnerEnabled?:    boolean
+  optionalDinnerEnabled?: boolean
+  occasionName?:          string
+}
+
 export interface BulkMealUpdateData {
   discordIds: string[]
   date:       string

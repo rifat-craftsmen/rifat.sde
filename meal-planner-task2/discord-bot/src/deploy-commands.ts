@@ -83,6 +83,54 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
       },
     ],
   },
+  {
+    name: 'update-schedule',
+    description: 'Update an existing meal schedule (Admin only)',
+    options: [
+      {
+        name: 'date',
+        description: 'Date of the schedule to update (YYYY-MM-DD)',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'lunch_enabled',
+        description: 'Enable or disable lunch',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'snacks_enabled',
+        description: 'Enable or disable snacks',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'iftar_enabled',
+        description: 'Enable or disable iftar',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'event_dinner_enabled',
+        description: 'Enable or disable event dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'optional_dinner_enabled',
+        description: 'Enable or disable optional dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'occasion_name',
+        description: 'Update the occasion name',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+    ],
+  },
 ]
 
 
