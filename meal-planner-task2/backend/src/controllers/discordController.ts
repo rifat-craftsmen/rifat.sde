@@ -4,6 +4,7 @@ import { handleMySchedule }     from '../commands/mySchedule.js'
 import { handleCreateSchedule } from '../commands/createSchedule.js'
 import { handleListSchedules }  from '../commands/listSchedules.js'
 import { handleDeleteSchedule } from '../commands/deleteSchedule.js'
+import { handleUpdateSchedule } from '../commands/updateSchedule.js'
 
 /**
  * Entry point for all Discord slash commands.
@@ -21,6 +22,7 @@ export const handleInteraction = async (req: AuthRequest, res: Response): Promis
         case 'create-schedule': await handleCreateSchedule(req, res); return
         case 'list-schedules':  await handleListSchedules(req, res);  return
         case 'delete-schedule': await handleDeleteSchedule(req, res); return
+        case 'update-schedule': await handleUpdateSchedule(req, res); return
         default:
           res.json({ type: 4, data: { content: `Unknown command \`/${data?.name}\`.`, flags: 64 } })
           return
