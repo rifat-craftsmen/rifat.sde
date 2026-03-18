@@ -3,7 +3,8 @@ import { OAuth2Client } from 'google-auth-library'
 
 interface APIGatewayAuthorizerEvent {
   headers:        Record<string, string>
-  methodArn:      string
+  routeArn?:      string
+  methodArn?:     string
   requestContext: { accountId: string }
 }
 
@@ -49,7 +50,7 @@ export const handler = async (event: APIGatewayAuthorizerEvent) => {
       throw new Error('Unauthorized')
     }
 
-    return buildPolicy('Allow', event.methodArn)
+    return buildPolicy('Allow', event.routeArn ?? event.methodArn ?? '*')
   } catch {
     throw new Error('Unauthorized')
   }

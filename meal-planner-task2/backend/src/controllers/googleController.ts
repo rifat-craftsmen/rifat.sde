@@ -17,8 +17,8 @@ import { handleDeleteSchedule } from '../commands/deleteSchedule.js'
  * Responses must be Google Chat Card JSON or { text: '...' }.
  */
 export const handleGoogleInteraction = async (req: AuthRequest, res: Response): Promise<void> => {
-  const event       = req.body as { type?: string; message?: { slashCommand?: { commandName?: string } } }
-  const commandName = event?.message?.slashCommand?.commandName?.replace(/^\//, '')
+  const event       = req.body as any
+  const commandName = (event?.message?.annotations?.[0]?.slashCommand?.commandName as string | undefined)?.replace(/^\//, '')
 
   if (!commandName) {
     res.json({ text: 'Unknown command.' })

@@ -8,8 +8,9 @@ export async function handleDeleteSchedule(req: AuthRequest, res: Response): Pro
     return
   }
 
-  const options: Array<{ name: string; value: string }> = req.body.data?.options ?? []
-  const date = options.find(o => o.name === 'date')?.value ?? ''
+  const date = req.user!.platform === 'google'
+    ? (req.body?.message?.argumentText as string ?? '').trim()
+    : (req.body.data?.options as Array<{ name: string; value: string }> ?? []).find(o => o.name === 'date')?.value ?? ''
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     res.json({ type: 4, data: { content: 'Invalid date format. Use YYYY-MM-DD.', flags: 64 } })

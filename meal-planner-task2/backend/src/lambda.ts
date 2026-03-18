@@ -4,14 +4,10 @@ import { app } from './app.js'
 const _handler = serverlessExpress({ app })
 
 export const handler = (event: any, context: any, callback: any) => {
-  console.log('[lambda] event:', JSON.stringify({
-    path: event.rawPath ?? event.path,
-    method: event.requestContext?.http?.method ?? event.httpMethod,
-    isBase64Encoded: event.isBase64Encoded,
-    bodyLength: event.body?.length,
-    bodyStart: event.body?.slice(0, 60),
-    sigHeader: event.headers?.['x-signature-ed25519']?.slice(0, 16),
-    tsHeader: event.headers?.['x-signature-timestamp'],
-  }))
+  // Ensure body is always a string for serverless-express body parsing
+  if (event.body && event.isBase64Encoded) {
+    event.body = Buffer.from(event.body, 'base64').toString('utf8')
+    event.isBase64Encoded = false
+  }
   return _handler(event, context, callback)
 }

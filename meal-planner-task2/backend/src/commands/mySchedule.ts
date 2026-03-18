@@ -5,11 +5,11 @@ import type { ScheduleDay, MealScheduleItem } from '../types/index.js'
 
 // Meal columns in display order
 const MEALS: Array<{ key: keyof MealScheduleItem; label: string }> = [
-  { key: 'lunchEnabled',         label: '🍱' },
-  { key: 'snacksEnabled',        label: '🍪' },
-  { key: 'iftarEnabled',         label: '🌙' },
-  { key: 'eventDinnerEnabled',   label: '🍽️' },
-  { key: 'optionalDinnerEnabled', label: '🥘' },
+  { key: 'lunchEnabled',          label: 'L' },
+  { key: 'snacksEnabled',         label: 'S' },
+  { key: 'iftarEnabled',          label: 'I' },
+  { key: 'eventDinnerEnabled',    label: 'ED' },
+  { key: 'optionalDinnerEnabled', label: 'OD' },
 ]
 
 const MEAL_RECORD_KEYS = ['lunch', 'snacks', 'iftar', 'eventDinner', 'optionalDinner'] as const
@@ -23,9 +23,9 @@ function formatDay(day: ScheduleDay): string {
     const enabled = day.schedule?.[m.key] as boolean | undefined
     if (!enabled) return '➖'                       // meal not offered
     const chosen = day.record?.[MEAL_RECORD_KEYS[i]] // true | false | null | undefined
-    if (chosen === true)  return `${m.label}✅`
-    if (chosen === false) return `${m.label}❌`
-    return `${m.label}⬜`                             // not set yet
+    if (chosen === true)  return `${m.label}:✅`
+    if (chosen === false) return `${m.label}:❌`
+    return `${m.label}:⬜`                             // not set yet
   }).join('  ')
 
   const wfh = (day.record?.workFromHome || day.globalWFH) ? '  🏠' : ''
