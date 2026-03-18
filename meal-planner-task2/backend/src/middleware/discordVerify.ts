@@ -31,15 +31,6 @@ export const discordVerify = (req: Request, res: Response, next: NextFunction): 
   const body    = req.body as Buffer
   const rawBody = body.toString('utf8')
 
-  console.log('[discordVerify] headers:', JSON.stringify({
-    signature:  signature?.slice(0, 16) + '...',
-    timestamp,
-    bodyLength: rawBody.length,
-    bodyStart:  rawBody.slice(0, 40),
-    publicKey:  publicKey.slice(0, 16) + '...',
-  }))
-
-  // Pass raw Buffer to verifyKey — avoids any string re-encoding issues
   const isValid = verifyKey(body, signature, timestamp, publicKey)
   if (!isValid) {
     console.error('[discordVerify] Signature invalid')
@@ -47,16 +38,13 @@ export const discordVerify = (req: Request, res: Response, next: NextFunction): 
     return
   }
 
-  // Parse body now that signature is confirmed
-  const interaction = JSON.parse((req.body as Buffer).toString())
+  const interaction = JSON.parse(rawBody)
 
-  // PING — respond immediately, no further processing needed
   if (interaction.type === 1) {
     res.json({ type: 1 })
     return
   }
 
-  // Replace raw Buffer with parsed object for downstream handlers
   req.body = interaction
   next()
 }

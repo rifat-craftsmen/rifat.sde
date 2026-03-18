@@ -19,6 +19,7 @@ export const googleAuth = async (
   next: NextFunction,
 ): Promise<void> => {
   const event = req.body
+  console.log('[googleAuth] body:', JSON.stringify(event))
   const email = event?.user?.email as string | undefined
 
   if (!email) {
@@ -47,6 +48,7 @@ export const googleAuth = async (
       discordId: profile.discordId,
       role:      profile.role as Role,
       teamId:    profile.teamId,
+      platform:  'google',
     }
     next()
   } catch (err) {

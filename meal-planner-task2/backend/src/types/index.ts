@@ -13,6 +13,7 @@ export interface AuthRequest extends Request {
     discordId: string
     role:      Role
     teamId?:   string
+    platform:  'discord' | 'google'
   }
 }
 

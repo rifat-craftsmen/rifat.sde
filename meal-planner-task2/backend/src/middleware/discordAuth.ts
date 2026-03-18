@@ -37,8 +37,9 @@ export const discordAuth = async (
 
     req.user = {
       discordId,
-      role:   result.Item['role'] as Role,
-      teamId: result.Item['teamId'] as string | undefined,
+      role:     result.Item['role'] as Role,
+      teamId:   result.Item['teamId'] as string | undefined,
+      platform: 'discord',
     }
     next()
   } catch (err) {
