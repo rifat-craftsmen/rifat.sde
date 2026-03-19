@@ -159,6 +159,12 @@ export interface CreateWfhPeriodData {
   note?:    string
 }
 
+export interface UpdateWfhPeriodData {
+  dateFrom?: string
+  dateTo?:   string
+  note?:     string
+}
+
 // ── Service / response shapes ─────────────────────────────────────────────
 
 export interface ScheduleDayView {
