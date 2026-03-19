@@ -204,6 +204,20 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
     ],
   },
 
+  // ── F7: Headcount ─────────────────────────────────────────────────────────
+  {
+    name: 'headcount',
+    description: 'View daily meal headcount and team breakdown (Admin/Logistics only)',
+    options: [
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format (defaults to today)',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+    ],
+  },
+
   // ── F4: Employee Meal Choices ──────────────────────────────────────────────
   {
     name: 'create-meal',
