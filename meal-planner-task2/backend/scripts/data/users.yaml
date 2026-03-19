@@ -59,3 +59,101 @@
   role: ADMIN
   status: ACTIVE
   teamId: null
+
+- discordId: "1467742584200892707"
+  name: Abdullah Ghalib
+  email: abdullah.ghalib@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "1467736090244022500"
+  name: Farhan Tanvir
+  email: farhan.tanvir@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "1467727728017936477"
+  name: Mehedi Hasan
+  email: mehedi.hasan@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "1467744839943721055"
+  name: Najmul Hasan
+  email: najmul.hasan@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "1071390812547580005"
+  name: Niloy Gabriel
+  email: niloy.gabriel@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "1467742734449377402"
+  name: Samin Yasar
+  email: samin.yasar@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "1467733883842990112"
+  name: Sayad Ibn
+  email: sayad.ibn@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "905679599877365820"
+  name: Akash
+  email: akash@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "150376500577697792"
+  name: Arif
+  email: arif@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "871633031868350485"
+  name: Israjur
+  email: israjur@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "917269897229246555"
+  name: Abir
+  email: abir@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "905470178584829952"
+  name: Khirul
+  email: khirul@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "1147050401292619847"
+  name: Amir
+  email: amir@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null
+
+- discordId: "581878102075113475"
+  name: Rishadul
+  email: rishadul@craftsmensoftware.com
+  role: EMPLOYEE
+  status: ACTIVE
+  teamId: null

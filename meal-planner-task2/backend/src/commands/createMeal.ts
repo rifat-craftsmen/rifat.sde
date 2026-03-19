@@ -13,7 +13,7 @@ export async function handleCreateMeal(req: AuthRequest, res: Response): Promise
   }
 
   try {
-    await createOrUpdateMealRecord(data.date, data, req.user!.discordId)
+    await createOrUpdateMealRecord(req.user!.discordId, data, req.user!.discordId)
   } catch (e: unknown) {
     if (e instanceof Error && e.message === 'User profile not found') {
       res.json({ type: 4, data: { content: 'Your profile was not found. Please contact an admin.', flags: 64 } })
