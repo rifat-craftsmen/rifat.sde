@@ -131,6 +131,176 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
       },
     ],
   },
+
+  // ── F6: WFH Period Management ─────────────────────────────────────────────
+  {
+    name: 'set-wfh-period',
+    description: 'Create a company-wide WFH period (Admin only)',
+    options: [
+      {
+        name: 'date_from',
+        description: 'Start date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'date_to',
+        description: 'End date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'note',
+        description: 'Optional note (e.g. "Eid holidays")',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+    ],
+  },
+  {
+    name: 'list-wfh-periods',
+    description: 'List all WFH periods (Admin only)',
+  },
+  {
+    name: 'update-wfh-period',
+    description: 'Update an existing WFH period (Admin only)',
+    options: [
+      {
+        name: 'id',
+        description: 'WFH period ID (from /list-wfh-periods)',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'date_from',
+        description: 'New start date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+      {
+        name: 'date_to',
+        description: 'New end date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+      {
+        name: 'note',
+        description: 'New note',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+      },
+    ],
+  },
+  {
+    name: 'delete-wfh-period',
+    description: 'Delete a WFH period by ID (Admin only)',
+    options: [
+      {
+        name: 'id',
+        description: 'WFH period ID (from /list-wfh-periods)',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+    ],
+  },
+
+  // ── F4: Employee Meal Choices ──────────────────────────────────────────────
+  {
+    name: 'create-meal',
+    description: 'Set your meal choices for a future weekday',
+    options: [
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'lunch',
+        description: 'Opt in or out of lunch',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'snacks',
+        description: 'Opt in or out of snacks',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'iftar',
+        description: 'Opt in or out of iftar',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'event_dinner',
+        description: 'Opt in or out of event dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'optional_dinner',
+        description: 'Opt in or out of optional dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'work_from_home',
+        description: 'Are you working from home this day?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+    ],
+  },
+  {
+    name: 'update-meal',
+    description: 'Update your meal choices for a future weekday',
+    options: [
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'lunch',
+        description: 'Opt in or out of lunch',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'snacks',
+        description: 'Opt in or out of snacks',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'iftar',
+        description: 'Opt in or out of iftar',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'event_dinner',
+        description: 'Opt in or out of event dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'optional_dinner',
+        description: 'Opt in or out of optional dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'work_from_home',
+        description: 'Are you working from home this day?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+    ],
+  },
 ]
 
 
