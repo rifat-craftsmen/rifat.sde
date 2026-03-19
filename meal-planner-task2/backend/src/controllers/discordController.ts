@@ -12,6 +12,7 @@ import { handleListWfhPeriods } from '../commands/listWfhPeriods.js'
 import { handleUpdateWfhPeriod } from '../commands/updateWfhPeriod.js'
 import { handleDeleteWfhPeriod } from '../commands/deleteWfhPeriod.js'
 import { handleHeadcount }       from '../commands/headcount.js'
+import { handleParticipation }   from '../commands/participation.js'
 
 /**
  * Entry point for all Discord slash commands.
@@ -37,6 +38,7 @@ export const handleInteraction = async (req: AuthRequest, res: Response): Promis
         case 'update-wfh-period': await handleUpdateWfhPeriod(req, res); return
         case 'delete-wfh-period': await handleDeleteWfhPeriod(req, res); return
         case 'headcount':         await handleHeadcount(req, res);       return
+        case 'participation':     await handleParticipation(req, res);   return
         default:
           res.json({ type: 4, data: { content: `Unknown command \`/${data?.name}\`.`, flags: 64 } })
           return

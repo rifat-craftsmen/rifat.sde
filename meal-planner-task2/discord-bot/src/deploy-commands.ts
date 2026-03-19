@@ -204,6 +204,20 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
     ],
   },
 
+  // ── F8: Participation View ────────────────────────────────────────────────
+  {
+    name: 'participation',
+    description: 'View per-employee meal participation for a date (Admin/Lead only)',
+    options: [
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+    ],
+  },
+
   // ── F7: Headcount ─────────────────────────────────────────────────────────
   {
     name: 'headcount',
