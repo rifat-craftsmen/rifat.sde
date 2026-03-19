@@ -11,6 +11,7 @@ import { handleSetWfhPeriod }   from '../commands/setWfhPeriod.js'
 import { handleListWfhPeriods } from '../commands/listWfhPeriods.js'
 import { handleUpdateWfhPeriod } from '../commands/updateWfhPeriod.js'
 import { handleDeleteWfhPeriod } from '../commands/deleteWfhPeriod.js'
+import { handleHeadcount }       from '../commands/headcount.js'
 
 /**
  * Entry point for all Google Chat slash commands.
@@ -45,6 +46,7 @@ export const handleGoogleInteraction = async (req: AuthRequest, res: Response): 
       case 'list-wfh-periods':  await handleListWfhPeriods(req, res);  return
       case 'update-wfh-period': await handleUpdateWfhPeriod(req, res); return
       case 'delete-wfh-period': await handleDeleteWfhPeriod(req, res); return
+      case 'headcount':         await handleHeadcount(req, res);       return
       default:
         res.json({ text: `Unknown command \`/${commandName}\`.` })
     }

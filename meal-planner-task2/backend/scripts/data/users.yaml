@@ -4,55 +4,6 @@
 # status:    ACTIVE | INACTIVE
 # teamId:    must match a teamId in teams.yaml, or null
 
-- discordId: "111111111111111111"
-  name: Alice Admin
-  email: alice@company.com
-  role: ADMIN
-  status: ACTIVE
-  teamId: null
-
-- discordId: "222222222222222222"
-  name: Sarah
-  email: sarah@company.com
-  role: EMPLOYEE
-  status: ACTIVE
-  teamId: team-engineering
-
-- discordId: "333333333333333333"
-  name: Bob
-  email: bob@company.com
-  role: LEAD
-  status: ACTIVE
-  teamId: team-engineering
-
-- discordId: "444444444444444444"
-  name: Carol Employee
-  email: carol@company.com
-  role: EMPLOYEE
-  status: ACTIVE
-  teamId: team-engineering
-
-- discordId: "555555555555555555"
-  name: Dan Lead
-  email: dan@company.com
-  role: LEAD
-  status: ACTIVE
-  teamId: team-marketing
-
-- discordId: "666666666666666666"
-  name: Eve Logistics
-  email: eve@company.com
-  role: LOGISTICS
-  status: INACTIVE
-  teamId: null
-
-- discordId: "777777777777777777"
-  name: Frank Former
-  email: frank@company.com
-  role: EMPLOYEE
-  status: ACTIVE
-  teamId: team-marketing
-
 - discordId: "1467732201599664230"
   name: Rifat Ahmed
   email: rifat.ahmed@craftsmensoftware.com
@@ -60,100 +11,106 @@
   status: ACTIVE
   teamId: null
 
+# ── Team Alpha ────────────────────────────────────────────────────────────────
+
 - discordId: "1467742584200892707"
   name: Abdullah Ghalib
   email: abdullah.ghalib@craftsmensoftware.com
-  role: EMPLOYEE
+  role: LEAD
   status: ACTIVE
-  teamId: null
+  teamId: team-alpha
 
 - discordId: "1467736090244022500"
   name: Farhan Tanvir
   email: farhan.tanvir@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-alpha
 
 - discordId: "1467727728017936477"
   name: Mehedi Hasan
   email: mehedi.hasan@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-alpha
 
 - discordId: "1467744839943721055"
   name: Najmul Hasan
   email: najmul.hasan@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-alpha
 
 - discordId: "1071390812547580005"
   name: Niloy Gabriel
   email: niloy.gabriel@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-alpha
+
+# ── Team Beta ─────────────────────────────────────────────────────────────────
 
 - discordId: "1467742734449377402"
   name: Samin Yasar
   email: samin.yasar@craftsmensoftware.com
-  role: EMPLOYEE
+  role: LEAD
   status: ACTIVE
-  teamId: null
+  teamId: team-beta
 
 - discordId: "1467733883842990112"
   name: Sayad Ibn
   email: sayad.ibn@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-beta
 
 - discordId: "905679599877365820"
   name: Akash
   email: akash@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-beta
 
 - discordId: "150376500577697792"
   name: Arif
   email: arif@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-beta
 
 - discordId: "871633031868350485"
   name: Israjur
   email: israjur@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-beta
+
+# ── Team Gamma ────────────────────────────────────────────────────────────────
 
 - discordId: "917269897229246555"
   name: Abir
   email: abir@craftsmensoftware.com
-  role: EMPLOYEE
+  role: LEAD
   status: ACTIVE
-  teamId: null
+  teamId: team-gamma
 
 - discordId: "905470178584829952"
   name: Khirul
   email: khirul@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-gamma
 
 - discordId: "1147050401292619847"
   name: Amir
   email: amir@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-gamma
 
 - discordId: "581878102075113475"
   name: Rishadul
   email: rishadul@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
-  teamId: null
+  teamId: team-gamma
