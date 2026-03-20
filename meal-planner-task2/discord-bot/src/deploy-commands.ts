@@ -204,6 +204,12 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
     ],
   },
 
+  // ── F9: Team Lead Views ───────────────────────────────────────────────────
+  {
+    name: 'team-members',
+    description: 'View your team roster with WFH counts (Lead only)',
+  },
+
   // ── F8: Participation View ────────────────────────────────────────────────
   {
     name: 'participation',
