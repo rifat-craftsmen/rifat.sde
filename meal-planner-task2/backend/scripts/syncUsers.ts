@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
-import { PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../src/config/dynamoClient.js'
 import type { Role, UserStatus } from '../src/types/index.js'
 
@@ -52,22 +52,24 @@ async function syncUsers() {
     const teamName = user.teamId ? (teamMap.get(user.teamId) ?? undefined) : undefined
 
     // ── Upsert UserProfile ─────────────────────────────────────────────────
-    await dynamo.send(new PutCommand({
-      TableName: TABLES.MAIN,
-      Item: {
-        PK:        `USER#${user.discordId}`,
-        SK:        'PROFILE',
-        discordId: user.discordId,
-        name:      user.name,
-        email:     user.email,
-        role:      user.role,
-        status:    user.status,
-        teamId:    user.teamId ?? undefined,
-        teamName:  teamName    ?? undefined,
-        wfhCount:  0,
-        wfhMonth,
-        createdAt: now,
-        updatedAt: now,
+    // Always update mutable fields (name, email, role, status, team).
+    // wfhCount/wfhMonth and createdAt use if_not_exists to preserve existing values on re-sync.
+    await dynamo.send(new UpdateCommand({
+      TableName:                 TABLES.MAIN,
+      Key:                       { PK: `USER#${user.discordId}`, SK: 'PROFILE' },
+      UpdateExpression:          'SET discordId = :discordId, #name = :name, email = :email, #role = :role, #status = :status, teamId = :teamId, teamName = :teamName, updatedAt = :now, wfhCount = if_not_exists(wfhCount, :zero), wfhMonth = if_not_exists(wfhMonth, :wfhMonth), createdAt = if_not_exists(createdAt, :now)',
+      ExpressionAttributeNames:  { '#name': 'name', '#role': 'role', '#status': 'status' },
+      ExpressionAttributeValues: {
+        ':discordId': user.discordId,
+        ':name':      user.name,
+        ':email':     user.email,
+        ':role':      user.role,
+        ':status':    user.status,
+        ':teamId':    user.teamId  ?? null,
+        ':teamName':  teamName     ?? null,
+        ':zero':      0,
+        ':wfhMonth':  wfhMonth,
+        ':now':       now,
       },
     }))
 

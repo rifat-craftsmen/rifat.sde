@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
-import { PutCommand } from '@aws-sdk/lib-dynamodb'
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../src/config/dynamoClient.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -26,18 +26,14 @@ async function syncTeams() {
   const now = new Date().toISOString()
 
   for (const team of teams) {
-    await dynamo.send(new PutCommand({
-      TableName: TABLES.MAIN,
-      Item: {
-        PK:        'TEAM',
-        SK:        team.teamId,
-        teamId:    team.teamId,
-        name:      team.name,
-        leadId:    team.leadId,
-        // memberIds is not set here — syncUsers.ts populates it via ADD
-        createdAt: now,
-        updatedAt: now,
-      },
+    await dynamo.send(new UpdateCommand({
+      TableName:                 TABLES.MAIN,
+      Key:                       { PK: 'TEAM', SK: team.teamId },
+      // memberIds is not set here — syncUsers.ts populates it via ADD
+      // createdAt uses if_not_exists to preserve the original timestamp on re-syncs
+      UpdateExpression:          'SET teamId = :teamId, #name = :name, leadId = :leadId, updatedAt = :now, createdAt = if_not_exists(createdAt, :now)',
+      ExpressionAttributeNames:  { '#name': 'name' },
+      ExpressionAttributeValues: { ':teamId': team.teamId, ':name': team.name, ':leadId': team.leadId, ':now': now },
     }))
 
     console.log(`  ✓ ${team.teamId}  (${team.name})  lead: ${team.leadId}`)
