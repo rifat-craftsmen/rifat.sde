@@ -1,12 +1,20 @@
 import 'dotenv/config'
-import { QueryCommand, BatchGetCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb'
+import { QueryCommand, BatchGetCommand, BatchWriteCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import {
   getTomorrowString,
   isWeekend,
 } from '../utils/dateHelpers.js'
 import { writeAuditLog } from '../services/auditService.js'
-import type { UserItem, MealRecordItem } from '../types/index.js'
+import type { UserItem, MealRecordItem, MealScheduleItem } from '../types/index.js'
+
+const DEFAULT_SCHEDULE = {
+  lunchEnabled:          true,
+  snacksEnabled:         true,
+  iftarEnabled:          false,
+  eventDinnerEnabled:    false,
+  optionalDinnerEnabled: false,
+}
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -41,7 +49,22 @@ async function createRecords(): Promise<void> {
     return
   }
 
-  // Get all active users via GSI (replaces ACTIVE_USERS sentinel)
+  // 1. Fetch schedule for tomorrow (fall back to defaults if none published)
+  const scheduleResult = await dynamo.send(new GetCommand({
+    TableName: TABLES.MAIN,
+    Key: { PK: 'SCHEDULE', SK: date },
+  }))
+  const schedule = (scheduleResult.Item as MealScheduleItem | undefined) ?? DEFAULT_SCHEDULE
+
+  const defaults = {
+    lunch:          schedule.lunchEnabled          ? true : null,
+    snacks:         schedule.snacksEnabled         ? true : null,
+    iftar:          schedule.iftarEnabled          ? true : null,
+    eventDinner:    schedule.eventDinnerEnabled    ? true : null,
+    optionalDinner: schedule.optionalDinnerEnabled ? true : null,
+  }
+
+  // 2. Get all active users
   const gsiResult = await dynamo.send(new QueryCommand({
     TableName:                 TABLES.MAIN,
     IndexName:                 'status-email-index',
@@ -56,38 +79,96 @@ async function createRecords(): Promise<void> {
   }
 
   const discordIds = activeUsers.map(u => u.discordId)
-  console.log(`Creating records for ${discordIds.length} users on ${date}`)
+  console.log(`Processing ${discordIds.length} users for ${date}`)
 
-  // BatchWrite in chunks of 25 (DynamoDB limit)
-  const now = new Date().toISOString()
-  const chunks = chunkArray(discordIds, 25)
-
-  for (const chunk of chunks) {
-    await dynamo.send(new BatchWriteCommand({
+  // 3. BatchGet existing records to avoid overwriting confirmed choices
+  const existingRecords: MealRecordItem[] = []
+  for (const chunk of chunkArray(discordIds, 100)) {
+    const batchResult = await dynamo.send(new BatchGetCommand({
       RequestItems: {
-        [TABLES.MAIN]: chunk.map(discordId => ({
-          PutRequest: {
-            Item: {
-              PK:             `USER#${discordId}`,
-              SK:             `RECORD#${date}`,
-              discordId,
-              date,
-              lunch:          null,
-              snacks:         null,
-              iftar:          null,
-              eventDinner:    null,
-              optionalDinner: null,
-              workFromHome:   false,
-              createdAt:      now,
-              updatedAt:      now,
-            } satisfies Omit<MealRecordItem, 'teamId' | 'teamName'>,
-          },
-        })),
+        [TABLES.MAIN]: {
+          Keys: chunk.map(id => ({ PK: `USER#${id}`, SK: `RECORD#${date}` })),
+        },
       },
     }))
+    existingRecords.push(...((batchResult.Responses?.[TABLES.MAIN] ?? []) as MealRecordItem[]))
   }
 
-  console.log(`Done. ${discordIds.length} records created for ${date}.`)
+  const existingByUser = new Map(existingRecords.map(r => [r.discordId, r]))
+  const userMap        = new Map(activeUsers.map(u => [u.discordId, u]))
+
+  const noRecord  = discordIds.filter(id => !existingByUser.has(id))
+  const hasRecord = discordIds.filter(id =>  existingByUser.has(id))
+
+  const now = new Date().toISOString()
+
+  // 4. Create new records for users who have none
+  if (noRecord.length) {
+    for (const chunk of chunkArray(noRecord, 25)) {
+      await dynamo.send(new BatchWriteCommand({
+        RequestItems: {
+          [TABLES.MAIN]: chunk.map(discordId => {
+            const user = userMap.get(discordId)
+            return {
+              PutRequest: {
+                Item: {
+                  PK:             `USER#${discordId}`,
+                  SK:             `RECORD#${date}`,
+                  discordId,
+                  date,
+                  ...defaults,
+                  workFromHome:   false,
+                  teamId:         user?.teamId,
+                  teamName:       user?.teamName,
+                  createdAt:      now,
+                  updatedAt:      now,
+                } satisfies MealRecordItem,
+              },
+            }
+          }),
+        },
+      }))
+    }
+    console.log(`Created ${noRecord.length} new records.`)
+  }
+
+  // 5. For existing records, fill only null meal fields with schedule defaults
+  let filledCount = 0
+  for (const discordId of hasRecord) {
+    const record  = existingByUser.get(discordId)!
+    const updates: string[] = []
+    const values: Record<string, unknown> = { ':now': now }
+
+    const mealFields = [
+      { field: 'lunch',          key: ':lunch',   val: defaults.lunch },
+      { field: 'snacks',         key: ':snacks',  val: defaults.snacks },
+      { field: 'iftar',          key: ':iftar',   val: defaults.iftar },
+      { field: 'eventDinner',    key: ':ed',      val: defaults.eventDinner },
+      { field: 'optionalDinner', key: ':od',      val: defaults.optionalDinner },
+    ] as const
+
+    for (const { field, key, val } of mealFields) {
+      if (record[field] === null && val !== null) {
+        updates.push(`${field} = ${key}`)
+        values[key] = val
+      }
+    }
+
+    if (updates.length) {
+      await dynamo.send(new UpdateCommand({
+        TableName:                 TABLES.MAIN,
+        Key:                       { PK: `USER#${discordId}`, SK: `RECORD#${date}` },
+        UpdateExpression:          `SET ${updates.join(', ')}, updatedAt = :now`,
+        ExpressionAttributeValues: values,
+      }))
+      filledCount++
+    }
+  }
+
+  if (filledCount) console.log(`Filled null fields in ${filledCount} existing records.`)
+
+  const total = noRecord.length + filledCount
+  console.log(`Done. ${total} records written for ${date}.`)
 
   await writeAuditLog({
     actorDiscordId: 'SYSTEM',
@@ -95,7 +176,7 @@ async function createRecords(): Promise<void> {
     action:         'CREATE',
     entityType:     'MEAL_RECORD',
     entityId:       date,
-    metadata:       { count: discordIds.length },
+    metadata:       { created: noRecord.length, filled: filledCount, date },
   })
 }
 
