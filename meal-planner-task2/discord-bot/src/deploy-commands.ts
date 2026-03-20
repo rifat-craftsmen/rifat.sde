@@ -209,6 +209,18 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
     name: 'team-members',
     description: 'View your team roster with WFH counts (Lead only)',
   },
+  {
+    name: 'employee-schedule',
+    description: "View a team member's 7-day meal schedule (Lead only)",
+    options: [
+      {
+        name: 'user',
+        description: 'Select the team member',
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+    ],
+  },
 
   // ── F8: Participation View ────────────────────────────────────────────────
   {
