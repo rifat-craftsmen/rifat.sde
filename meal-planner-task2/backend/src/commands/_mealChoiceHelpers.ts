@@ -21,6 +21,17 @@ function opt<T>(options: DiscordOption[], name: string): T | undefined {
   return found !== undefined ? (found.value as T) : undefined
 }
 
+/** 3-state token parser for Google Chat text commands.
+ *  `token`  → true  (opted in)
+ *  `-token` → false (explicit opt-out)
+ *  absent   → undefined (carry-forward / not specified)
+ */
+function parseToken(tokens: string[], name: string): boolean | undefined {
+  if (tokens.includes(name))       return true
+  if (tokens.includes(`-${name}`)) return false
+  return undefined
+}
+
 export async function parseMealOptions(req: AuthRequest): Promise<MealUpdateData> {
   if (req.user!.platform === 'google') {
     const argText = (req.body?.message?.argumentText as string ?? '').trim()
@@ -40,12 +51,12 @@ export async function parseMealOptions(req: AuthRequest): Promise<MealUpdateData
 
     return {
       date,
-      lunch:          schedule.lunchEnabled          ? (tokens.includes('lunch')          ? true : false) : null,
-      snacks:         schedule.snacksEnabled         ? (tokens.includes('snacks')         ? true : false) : null,
-      iftar:          schedule.iftarEnabled          ? (tokens.includes('iftar')          ? true : false) : null,
-      eventDinner:    schedule.eventDinnerEnabled    ? (tokens.includes('eventdinner')    ? true : false) : null,
-      optionalDinner: schedule.optionalDinnerEnabled ? (tokens.includes('optionaldinner') ? true : false) : null,
-      workFromHome:   tokens.includes('wfh'),
+      lunch:          schedule.lunchEnabled          ? parseToken(tokens, 'lunch')          : null,
+      snacks:         schedule.snacksEnabled         ? parseToken(tokens, 'snacks')         : null,
+      iftar:          schedule.iftarEnabled          ? parseToken(tokens, 'iftar')          : null,
+      eventDinner:    schedule.eventDinnerEnabled    ? parseToken(tokens, 'eventdinner')    : null,
+      optionalDinner: schedule.optionalDinnerEnabled ? parseToken(tokens, 'optionaldinner') : null,
+      workFromHome:   parseToken(tokens, 'wfh'),
     }
   }
 
