@@ -222,6 +222,116 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
     ],
   },
 
+  // ── F10: Proxy Edit ───────────────────────────────────────────────────────
+  {
+    name: 'create-employee-meal',
+    description: 'Create a meal record for a team member (Lead: own team, Admin: any)',
+    options: [
+      {
+        name: 'user',
+        description: 'Select the team member',
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'lunch',
+        description: 'Opt in or out of lunch',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'snacks',
+        description: 'Opt in or out of snacks',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'iftar',
+        description: 'Opt in or out of iftar',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'event_dinner',
+        description: 'Opt in or out of event dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'optional_dinner',
+        description: 'Opt in or out of optional dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'work_from_home',
+        description: 'Working from home?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+    ],
+  },
+  {
+    name: 'update-employee-meal',
+    description: 'Update a meal record for a team member (Lead: own team, Admin: any)',
+    options: [
+      {
+        name: 'user',
+        description: 'Select the team member',
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'lunch',
+        description: 'Opt in or out of lunch',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'snacks',
+        description: 'Opt in or out of snacks',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'iftar',
+        description: 'Opt in or out of iftar',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'event_dinner',
+        description: 'Opt in or out of event dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'optional_dinner',
+        description: 'Opt in or out of optional dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'work_from_home',
+        description: 'Working from home?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+    ],
+  },
+
   // ── F8: Participation View ────────────────────────────────────────────────
   {
     name: 'participation',

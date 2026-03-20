@@ -13,8 +13,10 @@ import { handleUpdateWfhPeriod } from '../commands/updateWfhPeriod.js'
 import { handleDeleteWfhPeriod } from '../commands/deleteWfhPeriod.js'
 import { handleHeadcount }       from '../commands/headcount.js'
 import { handleParticipation }   from '../commands/participation.js'
-import { handleTeamMembers }      from '../commands/teamMembers.js'
-import { handleEmployeeSchedule } from '../commands/employeeSchedule.js'
+import { handleTeamMembers }        from '../commands/teamMembers.js'
+import { handleEmployeeSchedule }   from '../commands/employeeSchedule.js'
+import { handleCreateEmployeeMeal } from '../commands/createEmployeeMeal.js'
+import { handleUpdateEmployeeMeal } from '../commands/updateEmployeeMeal.js'
 
 /**
  * Entry point for all Discord slash commands.
@@ -42,7 +44,9 @@ export const handleInteraction = async (req: AuthRequest, res: Response): Promis
         case 'headcount':         await handleHeadcount(req, res);       return
         case 'participation':     await handleParticipation(req, res);   return
         case 'team-members':       await handleTeamMembers(req, res);      return
-        case 'employee-schedule':  await handleEmployeeSchedule(req, res); return
+        case 'employee-schedule':      await handleEmployeeSchedule(req, res);   return
+        case 'create-employee-meal':   await handleCreateEmployeeMeal(req, res); return
+        case 'update-employee-meal':   await handleUpdateEmployeeMeal(req, res); return
         default:
           res.json({ type: 4, data: { content: `Unknown command \`/${data?.name}\`.`, flags: 64 } })
           return
