@@ -40,8 +40,9 @@ export async function handleEmployeeSchedule(req: AuthRequest, res: Response): P
     return
   }
 
-  // Parse target discordId
+  // Parse target discordId + display name
   let targetId: string
+  let targetLabel: string  // name for Google Chat, <@id> for Discord
   if (user.platform === 'google') {
     // Google Chat: extract email from @mention annotation
     const annotations: any[] = req.body?.message?.annotations ?? []
@@ -53,10 +54,11 @@ export async function handleEmployeeSchedule(req: AuthRequest, res: Response): P
     }
     const profile = await getUserByEmail(email)
     if (!profile) {
-      res.json({ text: `No active user found for the mentioned account.` })
+      res.json({ text: 'No active user found for the mentioned account.' })
       return
     }
-    targetId = profile.discordId
+    targetId    = profile.discordId
+    targetLabel = profile.name
   } else {
     // Discord User option — value is the selected user's Discord ID
     const options: Array<{ name: string; value: string }> = req.body.data?.options ?? []
@@ -65,6 +67,7 @@ export async function handleEmployeeSchedule(req: AuthRequest, res: Response): P
       res.json({ type: 4, data: { content: 'Please specify a team member.', flags: 64 } })
       return
     }
+    targetLabel = `<@${targetId}>`
   }
 
   // LEAD must verify the target belongs to their team; ADMIN has no restriction
@@ -88,7 +91,7 @@ export async function handleEmployeeSchedule(req: AuthRequest, res: Response): P
   res.json({
     type: 4,
     data: {
-      content: `📅 **Schedule for <@${targetId}>**\n\n${lines.join('\n')}\n\n${legend}`,
+      content: `📅 **Schedule for ${targetLabel}**\n\n${lines.join('\n')}\n\n${legend}`,
       flags: 64,
     },
   })

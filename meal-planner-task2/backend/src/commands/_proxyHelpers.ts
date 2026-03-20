@@ -1,5 +1,15 @@
-import { AuthRequest, MealUpdateData } from '../types/index.js'
+import { GetCommand } from '@aws-sdk/lib-dynamodb'
+import { dynamo, TABLES } from '../config/dynamoClient.js'
+import { AuthRequest, MealUpdateData, MealScheduleItem } from '../types/index.js'
 import { getUserByEmail } from '../services/teamService.js'
+
+const DEFAULT_SCHEDULE = {
+  lunchEnabled:          true,
+  snacksEnabled:         true,
+  iftarEnabled:          false,
+  eventDinnerEnabled:    false,
+  optionalDinnerEnabled: false,
+}
 
 interface DiscordOption {
   name:  string
@@ -20,7 +30,7 @@ function opt<T>(options: DiscordOption[], name: string): T | undefined {
  */
 export async function resolveProxyTarget(
   req: AuthRequest,
-): Promise<{ targetId: string; error?: never } | { targetId?: never; error: string }> {
+): Promise<{ targetId: string; targetName: string; error?: never } | { targetId?: never; targetName?: never; error: string }> {
   if (req.user!.platform === 'google') {
     const annotations: any[] = req.body?.message?.annotations ?? []
     const mention = annotations.find((a: any) => a.type === 'USER_MENTION')
@@ -32,14 +42,14 @@ export async function resolveProxyTarget(
     if (!profile) {
       return { error: 'No active user found for the mentioned account.' }
     }
-    return { targetId: profile.discordId }
+    return { targetId: profile.discordId, targetName: profile.name }
   }
 
-  // Discord: User picker option
+  // Discord: User picker option — <@id> mentions work natively, name not needed
   const options: DiscordOption[] = req.body.data?.options ?? []
   const targetId = opt<string>(options, 'user')
   if (!targetId) return { error: 'Please specify a team member.' }
-  return { targetId }
+  return { targetId, targetName: `<@${targetId}>` }
 }
 
 /**
@@ -48,7 +58,7 @@ export async function resolveProxyTarget(
  * Google Chat: argumentText is "@Mention YYYY-MM-DD meal1 meal2 ..."
  *              — locates the date by regex, parses everything after it.
  */
-export function parseProxyMealOptions(req: AuthRequest): MealUpdateData {
+export async function parseProxyMealOptions(req: AuthRequest): Promise<MealUpdateData> {
   if (req.user!.platform === 'google') {
     const argText = (req.body?.message?.argumentText as string ?? '').trim()
     const parts   = argText.split(/\s+/)
@@ -56,14 +66,27 @@ export function parseProxyMealOptions(req: AuthRequest): MealUpdateData {
     const dateIdx = parts.findIndex(p => /^\d{4}-\d{2}-\d{2}$/.test(p))
     const date    = dateIdx >= 0 ? parts[dateIdx] : ''
     const tokens  = dateIdx >= 0 ? parts.slice(dateIdx + 1).map(t => t.toLowerCase()) : []
+
+    // Fetch schedule to know which meals are enabled for this date
+    let schedule: typeof DEFAULT_SCHEDULE = DEFAULT_SCHEDULE
+    if (date) {
+      const result = await dynamo.send(new GetCommand({
+        TableName: TABLES.MAIN,
+        Key: { PK: 'SCHEDULE', SK: date },
+      }))
+      if (result.Item) schedule = result.Item as MealScheduleItem
+    }
+
+    // Enabled meals: listed = true, not listed = false (explicit opt-out, cron won't overwrite)
+    // Disabled meals: null (cron also ignores them, no point opting out of something not offered)
     return {
       date,
-      lunch:          tokens.includes('lunch')          ? true : undefined,
-      snacks:         tokens.includes('snacks')         ? true : undefined,
-      iftar:          tokens.includes('iftar')          ? true : undefined,
-      eventDinner:    tokens.includes('eventdinner')    ? true : undefined,
-      optionalDinner: tokens.includes('optionaldinner') ? true : undefined,
-      workFromHome:   tokens.includes('wfh')            ? true : undefined,
+      lunch:          schedule.lunchEnabled          ? (tokens.includes('lunch')          ? true : false) : null,
+      snacks:         schedule.snacksEnabled         ? (tokens.includes('snacks')         ? true : false) : null,
+      iftar:          schedule.iftarEnabled          ? (tokens.includes('iftar')          ? true : false) : null,
+      eventDinner:    schedule.eventDinnerEnabled    ? (tokens.includes('eventdinner')    ? true : false) : null,
+      optionalDinner: schedule.optionalDinnerEnabled ? (tokens.includes('optionaldinner') ? true : false) : null,
+      workFromHome:   tokens.includes('wfh'),
     }
   }
 

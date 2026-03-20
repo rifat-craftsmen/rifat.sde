@@ -20,7 +20,7 @@ export async function handleUpdateEmployeeMeal(req: AuthRequest, res: Response):
     res.json(isGoogle ? { text: resolved.error } : { type: 4, data: { content: resolved.error, flags: 64 } })
     return
   }
-  const targetId = resolved.targetId
+  const { targetId, targetName } = resolved
 
   // LEAD is scoped to their own team
   if (user.role === 'LEAD') {
@@ -37,7 +37,7 @@ export async function handleUpdateEmployeeMeal(req: AuthRequest, res: Response):
     }
   }
 
-  const data = parseProxyMealOptions(req)
+  const data = await parseProxyMealOptions(req)
   const err  = validateMealDate(data.date)
   if (err) {
     res.json(isGoogle ? { text: err } : { type: 4, data: { content: err, flags: 64 } })
@@ -56,6 +56,6 @@ export async function handleUpdateEmployeeMeal(req: AuthRequest, res: Response):
   }
 
   const wfhNote = data.workFromHome ? ' — 🏠 WFH noted.' : '.'
-  const msg = `Meal record updated for <@${targetId}> on **${data.date}**${wfhNote}`
+  const msg = `Meal record updated for **${targetName}** on **${data.date}**${wfhNote}`
   res.json(isGoogle ? { text: msg } : { type: 4, data: { content: msg, flags: 64 } })
 }

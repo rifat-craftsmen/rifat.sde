@@ -32,7 +32,9 @@ import { handleBulkUpdate }         from '../commands/bulkUpdate.js'
  */
 export const handleGoogleInteraction = async (req: AuthRequest, res: Response): Promise<void> => {
   const event       = req.body as any
-  const commandName = (event?.message?.annotations?.[0]?.slashCommand?.commandName as string | undefined)?.replace(/^\//, '')
+  const annotations: any[] = event?.message?.annotations ?? []
+  const slashAnnotation = annotations.find((a: any) => a.type === 'SLASH_COMMAND')
+  const commandName = (slashAnnotation?.slashCommand?.commandName as string | undefined)?.replace(/^\//, '')
 
   if (!commandName) {
     res.json({ text: 'Unknown command.' })
