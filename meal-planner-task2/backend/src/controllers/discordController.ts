@@ -17,6 +17,7 @@ import { handleTeamMembers }        from '../commands/teamMembers.js'
 import { handleEmployeeSchedule }   from '../commands/employeeSchedule.js'
 import { handleCreateEmployeeMeal } from '../commands/createEmployeeMeal.js'
 import { handleUpdateEmployeeMeal } from '../commands/updateEmployeeMeal.js'
+import { handleBulkUpdate }         from '../commands/bulkUpdate.js'
 
 /**
  * Entry point for all Discord slash commands.
@@ -47,6 +48,7 @@ export const handleInteraction = async (req: AuthRequest, res: Response): Promis
         case 'employee-schedule':      await handleEmployeeSchedule(req, res);   return
         case 'create-employee-meal':   await handleCreateEmployeeMeal(req, res); return
         case 'update-employee-meal':   await handleUpdateEmployeeMeal(req, res); return
+        case 'bulk-update':            await handleBulkUpdate(req, res);         return
         default:
           res.json({ type: 4, data: { content: `Unknown command \`/${data?.name}\`.`, flags: 64 } })
           return

@@ -332,6 +332,31 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
     ],
   },
 
+  {
+    name: 'bulk-update',
+    description: 'Apply a bulk meal action for all team members on a date (Lead: own team, Admin: all)',
+    options: [
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'action',
+        description: 'Action to apply',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        choices: [
+          { name: 'WFH all members',                    value: 'WFH_ALL' },
+          { name: 'Turn off all meals + WFH',           value: 'ALL_OFF' },
+          { name: 'Opt in to all schedule meals',       value: 'SET_ALL_MEALS' },
+          { name: 'Clear all meal choices',             value: 'UNSET_ALL_MEALS' },
+        ],
+      },
+    ],
+  },
+
   // ── F8: Participation View ────────────────────────────────────────────────
   {
     name: 'participation',
