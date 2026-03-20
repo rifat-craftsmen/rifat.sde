@@ -204,6 +204,24 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
     ],
   },
 
+  // ── F9: Team Lead Views ───────────────────────────────────────────────────
+  {
+    name: 'team-members',
+    description: 'View team roster with WFH counts (Lead: own team, Admin: all)',
+  },
+  {
+    name: 'employee-schedule',
+    description: "View a team member's 7-day meal schedule (Lead: own team, Admin: any)",
+    options: [
+      {
+        name: 'user',
+        description: 'Select the team member',
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+    ],
+  },
+
   // ── F8: Participation View ────────────────────────────────────────────────
   {
     name: 'participation',
