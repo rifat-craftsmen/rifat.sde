@@ -2,10 +2,12 @@ import 'dotenv/config'
 import { QueryCommand, BatchGetCommand, BatchWriteCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import {
+  getTodayString,
   getTomorrowString,
   isWeekend,
 } from '../utils/dateHelpers.js'
 import { writeAuditLog } from '../services/auditService.js'
+import { getHeadcount, formatHeadcountMessage } from '../services/headcountService.js'
 import type { UserItem, MealRecordItem, MealScheduleItem } from '../types/index.js'
 
 const DEFAULT_SCHEDULE = {
@@ -170,6 +172,11 @@ async function createRecords(): Promise<void> {
   const total = noRecord.length + filledCount
   console.log(`Done. ${total} records written for ${date}.`)
 
+  await postWebhook(
+    `🌙 **Nightly records created — ${date}**\n` +
+    `✅ New: **${noRecord.length}**  📝 Filled: **${filledCount}**  👥 Total active users: **${discordIds.length}**`
+  )
+
   await writeAuditLog({
     actorDiscordId: 'SYSTEM',
     actorName:      'SYSTEM',
@@ -187,93 +194,17 @@ async function createRecords(): Promise<void> {
  * and posts a report to the configured Discord channel.
  */
 async function sendHeadcountReport(): Promise<void> {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL
-  if (!webhookUrl) {
-    console.error('DISCORD_WEBHOOK_URL not set — skipping report.')
+  const date = getTodayString()
+  const data = await getHeadcount(date)
+
+  const content = formatHeadcountMessage(data)
+  if (!content) {
+    console.log(`No meal records found for ${date} — skipping report.`)
     return
   }
 
-  // Today's date string
-  const today = new Date()
-  const date  = today.toISOString().slice(0, 10)
-
-  // Get all active users via GSI
-  const gsiResult = await dynamo.send(new QueryCommand({
-    TableName:                 TABLES.MAIN,
-    IndexName:                 'status-email-index',
-    KeyConditionExpression:    '#status = :active',
-    ExpressionAttributeNames:  { '#status': 'status' },
-    ExpressionAttributeValues: { ':active': 'ACTIVE' },
-  }))
-  const activeUsers = (gsiResult.Items ?? []) as UserItem[]
-  if (!activeUsers.length) {
-    console.log('No active users — skipping report.')
-    return
-  }
-
-  const discordIds = activeUsers.map(u => u.discordId)
-
-  // BatchGet today's meal records for all active users (chunks of 100)
-  const records: MealRecordItem[] = []
-  const chunks = chunkArray(discordIds, 100)
-
-  for (const chunk of chunks) {
-    const batchResult = await dynamo.send(new BatchGetCommand({
-      RequestItems: {
-        [TABLES.MAIN]: {
-          Keys: chunk.map(id => ({ PK: `USER#${id}`, SK: `RECORD#${date}` })),
-        },
-      },
-    }))
-    records.push(...((batchResult.Responses?.[TABLES.MAIN] ?? []) as MealRecordItem[]))
-  }
-
-  // Aggregate counts
-  const office = records.filter(r => !r.workFromHome).length
-  const wfh    = records.filter(r => r.workFromHome).length
-  const lunch          = records.filter(r => r.lunch === true).length
-  const snacks         = records.filter(r => r.snacks === true).length
-  const iftar          = records.filter(r => r.iftar === true).length
-  const eventDinner    = records.filter(r => r.eventDinner === true).length
-  const optionalDinner = records.filter(r => r.optionalDinner === true).length
-
-  // Team breakdown
-  const teamMap = new Map<string, { name: string; lunch: number; snacks: number }>()
-  for (const r of records) {
-    if (!r.teamId) continue
-    const entry = teamMap.get(r.teamId) ?? { name: r.teamName ?? r.teamId, lunch: 0, snacks: 0 }
-    if (r.lunch  === true) entry.lunch++
-    if (r.snacks === true) entry.snacks++
-    teamMap.set(r.teamId, entry)
-  }
-
-  const teamLines = [...teamMap.values()]
-    .map(t => `  ${t.name}: Lunch ${t.lunch} | Snacks ${t.snacks}`)
-    .join('\n')
-
-  const message = [
-    `📊 **Daily Headcount — ${date}**`,
-    ``,
-    `🏢 Office: **${office}** | 🏠 WFH: **${wfh}**`,
-    ``,
-    `**Meal Counts:**`,
-    `🍱 Lunch: ${lunch}  🍪 Snacks: ${snacks}  🌙 Iftar: ${iftar}  🍽️ Event Dinner: ${eventDinner}  🥘 Optional Dinner: ${optionalDinner}`,
-    teamLines ? `\n**By Team:**\n${teamLines}` : '',
-  ].filter(Boolean).join('\n')
-
-  // Post to Discord via webhook
-  const response = await fetch(webhookUrl, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ content: message }),
-  })
-
-  if (!response.ok) {
-    const body = await response.text()
-    console.error(`Failed to post headcount report: ${response.status} ${body}`)
-  } else {
-    console.log('Headcount report posted successfully.')
-  }
+  await postWebhook(content)
+  console.log('Headcount report posted successfully.')
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -282,4 +213,21 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = []
   for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size))
   return chunks
+}
+
+async function postWebhook(content: string): Promise<void> {
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL
+  if (!webhookUrl) {
+    console.error('DISCORD_WEBHOOK_URL not set — skipping webhook post.')
+    return
+  }
+  const response = await fetch(webhookUrl, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ content }),
+  })
+  if (!response.ok) {
+    const body = await response.text()
+    console.error(`Webhook post failed: ${response.status} ${body}`)
+  }
 }
