@@ -1,4 +1,4 @@
-import { GetCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, BatchGetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import type { TeamItem, UserItem } from '../types/index.js'
 
@@ -57,6 +57,48 @@ export async function getTeamMembers(teamId: string): Promise<{
     .sort((a, b) => a.name.localeCompare(b.name))
 
   return { teamName: team.name, members }
+}
+
+/**
+ * Returns all active users for ADMIN view, sorted by teamName then name.
+ */
+export async function getAllActiveMembers(): Promise<TeamMemberView[]> {
+  const gsiResult = await dynamo.send(new QueryCommand({
+    TableName:                 TABLES.MAIN,
+    IndexName:                 'status-email-index',
+    KeyConditionExpression:    '#status = :active',
+    ExpressionAttributeNames:  { '#status': 'status' },
+    ExpressionAttributeValues: { ':active': 'ACTIVE' },
+  }))
+
+  const profiles = (gsiResult.Items ?? []) as UserItem[]
+
+  return profiles
+    .map(p => ({
+      discordId: p.discordId,
+      name:      p.name,
+      status:    p.status,
+      wfhCount:  p.wfhCount,
+      wfhMonth:  p.wfhMonth,
+      teamName:  p.teamName ?? '—',
+    }))
+    .sort((a, b) => a.teamName.localeCompare(b.teamName) || a.name.localeCompare(b.name))
+}
+
+/**
+ * Looks up a user profile by email via the status-email-index GSI.
+ * Returns the profile or undefined if not found.
+ */
+export async function getUserByEmail(email: string): Promise<UserItem | undefined> {
+  const result = await dynamo.send(new QueryCommand({
+    TableName:                 TABLES.MAIN,
+    IndexName:                 'status-email-index',
+    KeyConditionExpression:    '#status = :active AND email = :email',
+    ExpressionAttributeNames:  { '#status': 'status' },
+    ExpressionAttributeValues: { ':active': 'ACTIVE', ':email': email },
+    Limit: 1,
+  }))
+  return (result.Items?.[0]) as UserItem | undefined
 }
 
 /**

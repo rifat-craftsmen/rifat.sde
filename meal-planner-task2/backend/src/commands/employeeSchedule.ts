@@ -1,7 +1,7 @@
 import { Response } from 'express'
 import { AuthRequest } from '../types/index.js'
 import { getMySchedule } from '../services/mealService.js'
-import { isTeamMember } from '../services/teamService.js'
+import { isTeamMember, getUserByEmail } from '../services/teamService.js'
 import type { ScheduleDay, MealScheduleItem } from '../types/index.js'
 
 const MEALS: Array<{ key: keyof MealScheduleItem; label: string }> = [
@@ -43,16 +43,28 @@ export async function handleEmployeeSchedule(req: AuthRequest, res: Response): P
   // Parse target discordId
   let targetId: string
   if (user.platform === 'google') {
-    targetId = (req.body?.message?.argumentText as string ?? '').trim()
+    // Google Chat: extract email from @mention annotation
+    const annotations: any[] = req.body?.message?.annotations ?? []
+    const mention = annotations.find((a: any) => a.type === 'USER_MENTION')
+    const email: string | undefined = mention?.userMention?.user?.email
+    if (!email) {
+      res.json({ text: 'Please @mention a team member. Example: `/employee-schedule @Samin Yasar`' })
+      return
+    }
+    const profile = await getUserByEmail(email)
+    if (!profile) {
+      res.json({ text: `No active user found for the mentioned account.` })
+      return
+    }
+    targetId = profile.discordId
   } else {
     // Discord User option — value is the selected user's Discord ID
     const options: Array<{ name: string; value: string }> = req.body.data?.options ?? []
     targetId = options.find(o => o.name === 'user')?.value ?? ''
-  }
-
-  if (!targetId) {
-    res.json({ type: 4, data: { content: 'Please specify a team member.', flags: 64 } })
-    return
+    if (!targetId) {
+      res.json({ type: 4, data: { content: 'Please specify a team member.', flags: 64 } })
+      return
+    }
   }
 
   // LEAD must verify the target belongs to their team; ADMIN has no restriction

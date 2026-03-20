@@ -207,11 +207,11 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
   // ── F9: Team Lead Views ───────────────────────────────────────────────────
   {
     name: 'team-members',
-    description: 'View your team roster with WFH counts (Lead only)',
+    description: 'View team roster with WFH counts (Lead: own team, Admin: all)',
   },
   {
     name: 'employee-schedule',
-    description: "View a team member's 7-day meal schedule (Lead only)",
+    description: "View a team member's 7-day meal schedule (Lead: own team, Admin: any)",
     options: [
       {
         name: 'user',
