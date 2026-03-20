@@ -216,18 +216,37 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 async function postWebhook(content: string): Promise<void> {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL
-  if (!webhookUrl) {
-    console.error('DISCORD_WEBHOOK_URL not set — skipping webhook post.')
-    return
+  const posts: Promise<void>[] = []
+
+  const discordUrl = process.env.DISCORD_WEBHOOK_URL
+  if (discordUrl) {
+    posts.push(
+      fetch(discordUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ content }),
+      }).then(async r => {
+        if (!r.ok) console.error(`Discord webhook failed: ${r.status} ${await r.text()}`)
+      })
+    )
+  } else {
+    console.warn('DISCORD_WEBHOOK_URL not set — skipping Discord post.')
   }
-  const response = await fetch(webhookUrl, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ content }),
-  })
-  if (!response.ok) {
-    const body = await response.text()
-    console.error(`Webhook post failed: ${response.status} ${body}`)
+
+  const googleUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL
+  if (googleUrl) {
+    posts.push(
+      fetch(googleUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ text: content }),
+      }).then(async r => {
+        if (!r.ok) console.error(`Google Chat webhook failed: ${r.status} ${await r.text()}`)
+      })
+    )
+  } else {
+    console.warn('GOOGLE_CHAT_WEBHOOK_URL not set — skipping Google Chat post.')
   }
+
+  await Promise.all(posts)
 }
