@@ -4,7 +4,7 @@ import { createOrUpdateMealRecord } from '../services/mealService.js'
 import { parseMealOptions, validateMealDate } from './_mealChoiceHelpers.js'
 
 export async function handleCreateMeal(req: AuthRequest, res: Response): Promise<void> {
-  const data = parseMealOptions(req)
+  const data = await parseMealOptions(req)
 
   const err = validateMealDate(data.date)
   if (err) {

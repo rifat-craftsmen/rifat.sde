@@ -222,6 +222,142 @@ const commands: RESTPostAPIApplicationCommandsJSONBody[] = [
     ],
   },
 
+  // ── F10: Proxy Edit ───────────────────────────────────────────────────────
+  {
+    name: 'create-employee-meal',
+    description: 'Create a meal record for a team member (Lead: own team, Admin: any)',
+    options: [
+      {
+        name: 'user',
+        description: 'Select the team member',
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'lunch',
+        description: 'Opt in or out of lunch',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'snacks',
+        description: 'Opt in or out of snacks',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'iftar',
+        description: 'Opt in or out of iftar',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'event_dinner',
+        description: 'Opt in or out of event dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'optional_dinner',
+        description: 'Opt in or out of optional dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'work_from_home',
+        description: 'Working from home?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+    ],
+  },
+  {
+    name: 'update-employee-meal',
+    description: 'Update a meal record for a team member (Lead: own team, Admin: any)',
+    options: [
+      {
+        name: 'user',
+        description: 'Select the team member',
+        type: ApplicationCommandOptionType.User,
+        required: true,
+      },
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'lunch',
+        description: 'Opt in or out of lunch',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'snacks',
+        description: 'Opt in or out of snacks',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'iftar',
+        description: 'Opt in or out of iftar',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'event_dinner',
+        description: 'Opt in or out of event dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'optional_dinner',
+        description: 'Opt in or out of optional dinner',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+      {
+        name: 'work_from_home',
+        description: 'Working from home?',
+        type: ApplicationCommandOptionType.Boolean,
+        required: false,
+      },
+    ],
+  },
+
+  {
+    name: 'bulk-update',
+    description: 'Apply a bulk meal action for all team members on a date (Lead: own team, Admin: all)',
+    options: [
+      {
+        name: 'date',
+        description: 'Date in YYYY-MM-DD format',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+      },
+      {
+        name: 'action',
+        description: 'Action to apply',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        choices: [
+          { name: 'WFH_ON',               value: 'WFH_ON' },
+          { name: 'WFH_OFF',              value: 'WFH_OFF' },
+          { name: 'SET_AVAILABLE_MEALS',  value: 'SET_AVAILABLE_MEALS' },
+          { name: 'UNSET_AVAILABLE_MEALS',value: 'UNSET_AVAILABLE_MEALS' },
+          { name: 'UNSET_ALL_MEALS',      value: 'UNSET_ALL_MEALS' },
+        ],
+      },
+    ],
+  },
+
   // ── F8: Participation View ────────────────────────────────────────────────
   {
     name: 'participation',

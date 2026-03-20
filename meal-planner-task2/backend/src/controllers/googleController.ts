@@ -13,8 +13,11 @@ import { handleUpdateWfhPeriod } from '../commands/updateWfhPeriod.js'
 import { handleDeleteWfhPeriod } from '../commands/deleteWfhPeriod.js'
 import { handleHeadcount }       from '../commands/headcount.js'
 import { handleParticipation }   from '../commands/participation.js'
-import { handleTeamMembers }      from '../commands/teamMembers.js'
-import { handleEmployeeSchedule } from '../commands/employeeSchedule.js'
+import { handleTeamMembers }        from '../commands/teamMembers.js'
+import { handleEmployeeSchedule }   from '../commands/employeeSchedule.js'
+import { handleCreateEmployeeMeal } from '../commands/createEmployeeMeal.js'
+import { handleUpdateEmployeeMeal } from '../commands/updateEmployeeMeal.js'
+import { handleBulkUpdate }         from '../commands/bulkUpdate.js'
 
 /**
  * Entry point for all Google Chat slash commands.
@@ -29,7 +32,9 @@ import { handleEmployeeSchedule } from '../commands/employeeSchedule.js'
  */
 export const handleGoogleInteraction = async (req: AuthRequest, res: Response): Promise<void> => {
   const event       = req.body as any
-  const commandName = (event?.message?.annotations?.[0]?.slashCommand?.commandName as string | undefined)?.replace(/^\//, '')
+  const annotations: any[] = event?.message?.annotations ?? []
+  const slashAnnotation = annotations.find((a: any) => a.type === 'SLASH_COMMAND')
+  const commandName = (slashAnnotation?.slashCommand?.commandName as string | undefined)?.replace(/^\//, '')
 
   if (!commandName) {
     res.json({ text: 'Unknown command.' })
@@ -52,7 +57,10 @@ export const handleGoogleInteraction = async (req: AuthRequest, res: Response): 
       case 'headcount':         await handleHeadcount(req, res);       return
       case 'participation':     await handleParticipation(req, res);   return
       case 'team-members':       await handleTeamMembers(req, res);      return
-      case 'employee-schedule':  await handleEmployeeSchedule(req, res); return
+      case 'employee-schedule':      await handleEmployeeSchedule(req, res);   return
+      case 'create-employee-meal':   await handleCreateEmployeeMeal(req, res); return
+      case 'update-employee-meal':   await handleUpdateEmployeeMeal(req, res); return
+      case 'bulk-update':            await handleBulkUpdate(req, res);         return
       default:
         res.json({ text: `Unknown command \`/${commandName}\`.` })
     }

@@ -1,5 +1,15 @@
-import { AuthRequest, MealUpdateData } from '../types/index.js'
+import { GetCommand } from '@aws-sdk/lib-dynamodb'
+import { dynamo, TABLES } from '../config/dynamoClient.js'
+import { AuthRequest, MealUpdateData, MealScheduleItem } from '../types/index.js'
 import { getTodayString, isWeekend, isDateInValidWindow } from '../utils/dateHelpers.js'
+
+const DEFAULT_SCHEDULE = {
+  lunchEnabled:          true,
+  snacksEnabled:         true,
+  iftarEnabled:          false,
+  eventDinnerEnabled:    false,
+  optionalDinnerEnabled: false,
+}
 
 interface DiscordOption {
   name:  string
@@ -11,20 +21,31 @@ function opt<T>(options: DiscordOption[], name: string): T | undefined {
   return found !== undefined ? (found.value as T) : undefined
 }
 
-export function parseMealOptions(req: AuthRequest): MealUpdateData {
+export async function parseMealOptions(req: AuthRequest): Promise<MealUpdateData> {
   if (req.user!.platform === 'google') {
     const argText = (req.body?.message?.argumentText as string ?? '').trim()
     const parts   = argText.split(/\s+/)
     const date    = parts[0] ?? ''
     const tokens  = parts.slice(1).map(t => t.toLowerCase())
+
+    // Fetch schedule to distinguish enabled vs disabled meals
+    let schedule: typeof DEFAULT_SCHEDULE = DEFAULT_SCHEDULE
+    if (date) {
+      const result = await dynamo.send(new GetCommand({
+        TableName: TABLES.MAIN,
+        Key: { PK: 'SCHEDULE', SK: date },
+      }))
+      if (result.Item) schedule = result.Item as MealScheduleItem
+    }
+
     return {
       date,
-      lunch:          tokens.includes('lunch')          ? true : undefined,
-      snacks:         tokens.includes('snacks')         ? true : undefined,
-      iftar:          tokens.includes('iftar')          ? true : undefined,
-      eventDinner:    tokens.includes('eventdinner')    ? true : undefined,
-      optionalDinner: tokens.includes('optionaldinner') ? true : undefined,
-      workFromHome:   tokens.includes('wfh')            ? true : undefined,
+      lunch:          schedule.lunchEnabled          ? (tokens.includes('lunch')          ? true : false) : null,
+      snacks:         schedule.snacksEnabled         ? (tokens.includes('snacks')         ? true : false) : null,
+      iftar:          schedule.iftarEnabled          ? (tokens.includes('iftar')          ? true : false) : null,
+      eventDinner:    schedule.eventDinnerEnabled    ? (tokens.includes('eventdinner')    ? true : false) : null,
+      optionalDinner: schedule.optionalDinnerEnabled ? (tokens.includes('optionaldinner') ? true : false) : null,
+      workFromHome:   tokens.includes('wfh'),
     }
   }
 
