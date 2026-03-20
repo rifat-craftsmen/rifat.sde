@@ -4,13 +4,14 @@ import { applyBulkAction, getAllActiveMemberIds } from '../services/bulkUpdateSe
 import { getTeamMembers } from '../services/teamService.js'
 
 const DATE_RE   = /^\d{4}-\d{2}-\d{2}$/
-const VALID_ACTIONS: BulkAction[] = ['WFH_ALL', 'ALL_OFF', 'SET_ALL_MEALS', 'UNSET_ALL_MEALS']
+const VALID_ACTIONS: BulkAction[] = ['WFH_ON', 'WFH_OFF', 'SET_AVAILABLE_MEALS', 'UNSET_AVAILABLE_MEALS', 'UNSET_ALL_MEALS']
 
 const ACTION_LABELS: Record<BulkAction, string> = {
-  WFH_ALL:        'WFH flagged for all members',
-  ALL_OFF:        'All meals turned off for all members',
-  SET_ALL_MEALS:  'All schedule meals opted in for all members',
-  UNSET_ALL_MEALS:'All meal choices cleared for all members',
+  WFH_ON:               'WFH flagged + available meals opted out for all members',
+  WFH_OFF:              'WFH cleared for all members (meals unchanged)',
+  SET_AVAILABLE_MEALS:  'All scheduled meals opted in + WFH cleared for all members',
+  UNSET_AVAILABLE_MEALS:'All scheduled meals opted out for all members (WFH unchanged)',
+  UNSET_ALL_MEALS:      'All meals hard-opted out for all members (WFH unchanged)',
 }
 
 export async function handleBulkUpdate(req: AuthRequest, res: Response): Promise<void> {

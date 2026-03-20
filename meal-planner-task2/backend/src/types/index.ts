@@ -2,7 +2,7 @@ import { Request } from 'express'
 
 export type Role = 'EMPLOYEE' | 'LEAD' | 'ADMIN' | 'LOGISTICS'
 export type UserStatus = 'ACTIVE' | 'INACTIVE'
-export type BulkAction = 'WFH_ALL' | 'ALL_OFF' | 'SET_ALL_MEALS' | 'UNSET_ALL_MEALS'
+export type BulkAction = 'WFH_ON' | 'WFH_OFF' | 'SET_AVAILABLE_MEALS' | 'UNSET_AVAILABLE_MEALS' | 'UNSET_ALL_MEALS'
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE'
 export type AuditEntityType = 'USER' | 'MEAL_RECORD' | 'SCHEDULE' | 'TEAM' | 'WFH_PERIOD'
 
