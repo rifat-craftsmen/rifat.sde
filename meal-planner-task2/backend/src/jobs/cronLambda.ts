@@ -5,10 +5,12 @@ import {
   getTodayString,
   getTomorrowString,
   isWeekend,
+  isDateInPeriod,
+  getCurrentMonthKey,
 } from '../utils/dateHelpers.js'
 import { writeAuditLog } from '../services/auditService.js'
 import { getHeadcount, formatHeadcountMessage } from '../services/headcountService.js'
-import type { UserItem, MealRecordItem, MealScheduleItem } from '../types/index.js'
+import type { UserItem, MealRecordItem, MealScheduleItem, WfhPeriodItem } from '../types/index.js'
 
 const DEFAULT_SCHEDULE = {
   lunchEnabled:          true,
@@ -99,6 +101,20 @@ async function createRecords(): Promise<void> {
   const existingByUser = new Map(existingRecords.map(r => [r.discordId, r]))
   const userMap        = new Map(activeUsers.map(u => [u.discordId, u]))
 
+  // Check if tomorrow falls within a company-wide WFH period
+  const wfhPeriodsResult = await dynamo.send(new QueryCommand({
+    TableName:                 TABLES.MAIN,
+    KeyConditionExpression:    'PK = :pk',
+    ExpressionAttributeValues: { ':pk': 'WFHPERIOD' },
+  }))
+  const wfhPeriods  = (wfhPeriodsResult.Items ?? []) as WfhPeriodItem[]
+  const isGlobalWFH = wfhPeriods.some(p => isDateInPeriod(date, p.dateFrom, p.dateTo))
+
+  if (isGlobalWFH) console.log(`Global WFH period active for ${date} — all meals disabled, WFH = true.`)
+
+  // Track users whose WFH goes false → true (need counter increment)
+  const wfhIncrementIds: string[] = []
+
   const noRecord  = discordIds.filter(id => !existingByUser.has(id))
   const hasRecord = discordIds.filter(id =>  existingByUser.has(id))
 
@@ -118,8 +134,12 @@ async function createRecords(): Promise<void> {
                   SK:             `RECORD#${date}`,
                   discordId,
                   date,
-                  ...defaults,
-                  workFromHome:   false,
+                  lunch:          isGlobalWFH ? false : defaults.lunch,
+                  snacks:         isGlobalWFH ? false : defaults.snacks,
+                  iftar:          isGlobalWFH ? false : defaults.iftar,
+                  eventDinner:    isGlobalWFH ? false : defaults.eventDinner,
+                  optionalDinner: isGlobalWFH ? false : defaults.optionalDinner,
+                  workFromHome:   isGlobalWFH ? true  : false,
                   teamId:         user?.teamId,
                   teamName:       user?.teamName,
                   createdAt:      now,
@@ -132,42 +152,78 @@ async function createRecords(): Promise<void> {
       }))
     }
     console.log(`Created ${noRecord.length} new records.`)
+    if (isGlobalWFH) wfhIncrementIds.push(...noRecord)
   }
 
-  // 5. For existing records, fill only null meal fields with schedule defaults
+  // 5. For existing records:
+  //    - Global WFH day: override all meals → false, workFromHome → true
+  //    - Normal day: fill only null meal fields with schedule defaults
   let filledCount = 0
   for (const discordId of hasRecord) {
-    const record  = existingByUser.get(discordId)!
-    const updates: string[] = []
-    const values: Record<string, unknown> = { ':now': now }
+    const record = existingByUser.get(discordId)!
 
-    const mealFields = [
-      { field: 'lunch',          key: ':lunch',   val: defaults.lunch },
-      { field: 'snacks',         key: ':snacks',  val: defaults.snacks },
-      { field: 'iftar',          key: ':iftar',   val: defaults.iftar },
-      { field: 'eventDinner',    key: ':ed',      val: defaults.eventDinner },
-      { field: 'optionalDinner', key: ':od',      val: defaults.optionalDinner },
-    ] as const
-
-    for (const { field, key, val } of mealFields) {
-      if (record[field] === null && val !== null) {
-        updates.push(`${field} = ${key}`)
-        values[key] = val
-      }
-    }
-
-    if (updates.length) {
+    if (isGlobalWFH) {
       await dynamo.send(new UpdateCommand({
         TableName:                 TABLES.MAIN,
         Key:                       { PK: `USER#${discordId}`, SK: `RECORD#${date}` },
-        UpdateExpression:          `SET ${updates.join(', ')}, updatedAt = :now`,
-        ExpressionAttributeValues: values,
+        UpdateExpression:          'SET lunch = :f, snacks = :f, iftar = :f, eventDinner = :f, optionalDinner = :f, workFromHome = :t, updatedAt = :now',
+        ExpressionAttributeValues: { ':f': false, ':t': true, ':now': now },
       }))
+      if (!record.workFromHome) wfhIncrementIds.push(discordId)
       filledCount++
+    } else {
+      const updates: string[] = []
+      const values: Record<string, unknown> = { ':now': now }
+
+      const mealFields = [
+        { field: 'lunch',          key: ':lunch',   val: defaults.lunch },
+        { field: 'snacks',         key: ':snacks',  val: defaults.snacks },
+        { field: 'iftar',          key: ':iftar',   val: defaults.iftar },
+        { field: 'eventDinner',    key: ':ed',      val: defaults.eventDinner },
+        { field: 'optionalDinner', key: ':od',      val: defaults.optionalDinner },
+      ] as const
+
+      for (const { field, key, val } of mealFields) {
+        if (record[field] === null && val !== null) {
+          updates.push(`${field} = ${key}`)
+          values[key] = val
+        }
+      }
+
+      if (updates.length) {
+        await dynamo.send(new UpdateCommand({
+          TableName:                 TABLES.MAIN,
+          Key:                       { PK: `USER#${discordId}`, SK: `RECORD#${date}` },
+          UpdateExpression:          `SET ${updates.join(', ')}, updatedAt = :now`,
+          ExpressionAttributeValues: values,
+        }))
+        filledCount++
+      }
     }
   }
 
-  if (filledCount) console.log(`Filled null fields in ${filledCount} existing records.`)
+  if (isGlobalWFH && filledCount) console.log(`Overrode ${filledCount} existing records for global WFH day.`)
+  else if (filledCount)           console.log(`Filled null fields in ${filledCount} existing records.`)
+
+  // 6. Increment WFH counter for users transitioning false → true
+  if (wfhIncrementIds.length) {
+    const currentMonthKey = getCurrentMonthKey()
+    for (const discordId of wfhIncrementIds) {
+      const user = userMap.get(discordId)!
+      const isNewMonth = user.wfhMonth !== currentMonthKey
+      await dynamo.send(new UpdateCommand({
+        TableName:                 TABLES.MAIN,
+        Key:                       { PK: `USER#${discordId}`, SK: 'PROFILE' },
+        UpdateExpression:          'SET wfhCount = :count, wfhMonth = :month, updatedAt = :now',
+        ExpressionAttributeValues: {
+          ':count': isNewMonth ? 1 : user.wfhCount + 1,
+          ':month': currentMonthKey,
+          ':now':   now,
+        },
+      }))
+    }
+    console.log(`Incremented WFH counter for ${wfhIncrementIds.length} users.`)
+  }
 
   const total = noRecord.length + filledCount
   console.log(`Done. ${total} records written for ${date}.`)
