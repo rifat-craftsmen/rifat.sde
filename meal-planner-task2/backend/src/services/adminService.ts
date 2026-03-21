@@ -123,10 +123,18 @@ export async function getAllMealSchedules(): Promise<MealScheduleItem[]> {
 }
 
 export async function deleteMealSchedule(date: string): Promise<void> {
-  await dynamo.send(new DeleteCommand({
-    TableName: TABLES.MAIN,
-    Key: { PK: 'SCHEDULE', SK: date },
-  }))
+  try {
+    await dynamo.send(new DeleteCommand({
+      TableName:           TABLES.MAIN,
+      Key:                 { PK: 'SCHEDULE', SK: date },
+      ConditionExpression: 'attribute_exists(PK)',
+    }))
+  } catch (err: any) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      throw new Error(`No schedule found for ${date}`)
+    }
+    throw err
+  }
 }
 
 export async function deleteMealScheduleWithAudit(

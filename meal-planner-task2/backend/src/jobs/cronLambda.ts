@@ -1,12 +1,24 @@
 import 'dotenv/config'
-import { QueryCommand, BatchGetCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb'
+import { QueryCommand, BatchGetCommand, BatchWriteCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import {
+  getTodayString,
   getTomorrowString,
   isWeekend,
+  isDateInPeriod,
+  getCurrentMonthKey,
 } from '../utils/dateHelpers.js'
 import { writeAuditLog } from '../services/auditService.js'
-import type { UserItem, MealRecordItem } from '../types/index.js'
+import { getHeadcount, formatHeadcountMessage } from '../services/headcountService.js'
+import type { UserItem, MealRecordItem, MealScheduleItem, WfhPeriodItem } from '../types/index.js'
+
+const DEFAULT_SCHEDULE = {
+  lunchEnabled:          true,
+  snacksEnabled:         true,
+  iftarEnabled:          false,
+  eventDinnerEnabled:    false,
+  optionalDinnerEnabled: false,
+}
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -41,7 +53,22 @@ async function createRecords(): Promise<void> {
     return
   }
 
-  // Get all active users via GSI (replaces ACTIVE_USERS sentinel)
+  // 1. Fetch schedule for tomorrow (fall back to defaults if none published)
+  const scheduleResult = await dynamo.send(new GetCommand({
+    TableName: TABLES.MAIN,
+    Key: { PK: 'SCHEDULE', SK: date },
+  }))
+  const schedule = (scheduleResult.Item as MealScheduleItem | undefined) ?? DEFAULT_SCHEDULE
+
+  const defaults = {
+    lunch:          schedule.lunchEnabled          ? true : null,
+    snacks:         schedule.snacksEnabled         ? true : null,
+    iftar:          schedule.iftarEnabled          ? true : null,
+    eventDinner:    schedule.eventDinnerEnabled    ? true : null,
+    optionalDinner: schedule.optionalDinnerEnabled ? true : null,
+  }
+
+  // 2. Get all active users
   const gsiResult = await dynamo.send(new QueryCommand({
     TableName:                 TABLES.MAIN,
     IndexName:                 'status-email-index',
@@ -56,38 +83,155 @@ async function createRecords(): Promise<void> {
   }
 
   const discordIds = activeUsers.map(u => u.discordId)
-  console.log(`Creating records for ${discordIds.length} users on ${date}`)
+  console.log(`Processing ${discordIds.length} users for ${date}`)
 
-  // BatchWrite in chunks of 25 (DynamoDB limit)
-  const now = new Date().toISOString()
-  const chunks = chunkArray(discordIds, 25)
-
-  for (const chunk of chunks) {
-    await dynamo.send(new BatchWriteCommand({
+  // 3. BatchGet existing records to avoid overwriting confirmed choices
+  const existingRecords: MealRecordItem[] = []
+  for (const chunk of chunkArray(discordIds, 100)) {
+    const batchResult = await dynamo.send(new BatchGetCommand({
       RequestItems: {
-        [TABLES.MAIN]: chunk.map(discordId => ({
-          PutRequest: {
-            Item: {
-              PK:             `USER#${discordId}`,
-              SK:             `RECORD#${date}`,
-              discordId,
-              date,
-              lunch:          null,
-              snacks:         null,
-              iftar:          null,
-              eventDinner:    null,
-              optionalDinner: null,
-              workFromHome:   false,
-              createdAt:      now,
-              updatedAt:      now,
-            } satisfies Omit<MealRecordItem, 'teamId' | 'teamName'>,
-          },
-        })),
+        [TABLES.MAIN]: {
+          Keys: chunk.map(id => ({ PK: `USER#${id}`, SK: `RECORD#${date}` })),
+        },
       },
     }))
+    existingRecords.push(...((batchResult.Responses?.[TABLES.MAIN] ?? []) as MealRecordItem[]))
   }
 
-  console.log(`Done. ${discordIds.length} records created for ${date}.`)
+  const existingByUser = new Map(existingRecords.map(r => [r.discordId, r]))
+  const userMap        = new Map(activeUsers.map(u => [u.discordId, u]))
+
+  // Check if tomorrow falls within a company-wide WFH period
+  const wfhPeriodsResult = await dynamo.send(new QueryCommand({
+    TableName:                 TABLES.MAIN,
+    KeyConditionExpression:    'PK = :pk',
+    ExpressionAttributeValues: { ':pk': 'WFHPERIOD' },
+  }))
+  const wfhPeriods  = (wfhPeriodsResult.Items ?? []) as WfhPeriodItem[]
+  const isGlobalWFH = wfhPeriods.some(p => isDateInPeriod(date, p.dateFrom, p.dateTo))
+
+  if (isGlobalWFH) console.log(`Global WFH period active for ${date} — all meals disabled, WFH = true.`)
+
+  // Track users whose WFH goes false → true (need counter increment)
+  const wfhIncrementIds: string[] = []
+
+  const noRecord  = discordIds.filter(id => !existingByUser.has(id))
+  const hasRecord = discordIds.filter(id =>  existingByUser.has(id))
+
+  const now = new Date().toISOString()
+
+  // 4. Create new records for users who have none
+  if (noRecord.length) {
+    for (const chunk of chunkArray(noRecord, 25)) {
+      await dynamo.send(new BatchWriteCommand({
+        RequestItems: {
+          [TABLES.MAIN]: chunk.map(discordId => {
+            const user = userMap.get(discordId)
+            return {
+              PutRequest: {
+                Item: {
+                  PK:             `USER#${discordId}`,
+                  SK:             `RECORD#${date}`,
+                  discordId,
+                  date,
+                  lunch:          isGlobalWFH ? false : defaults.lunch,
+                  snacks:         isGlobalWFH ? false : defaults.snacks,
+                  iftar:          isGlobalWFH ? false : defaults.iftar,
+                  eventDinner:    isGlobalWFH ? false : defaults.eventDinner,
+                  optionalDinner: isGlobalWFH ? false : defaults.optionalDinner,
+                  workFromHome:   isGlobalWFH ? true  : false,
+                  teamId:         user?.teamId,
+                  teamName:       user?.teamName,
+                  createdAt:      now,
+                  updatedAt:      now,
+                } satisfies MealRecordItem,
+              },
+            }
+          }),
+        },
+      }))
+    }
+    console.log(`Created ${noRecord.length} new records.`)
+    if (isGlobalWFH) wfhIncrementIds.push(...noRecord)
+  }
+
+  // 5. For existing records:
+  //    - Global WFH day: override all meals → false, workFromHome → true
+  //    - Normal day: fill only null meal fields with schedule defaults
+  let filledCount = 0
+  for (const discordId of hasRecord) {
+    const record = existingByUser.get(discordId)!
+
+    if (isGlobalWFH) {
+      await dynamo.send(new UpdateCommand({
+        TableName:                 TABLES.MAIN,
+        Key:                       { PK: `USER#${discordId}`, SK: `RECORD#${date}` },
+        UpdateExpression:          'SET lunch = :f, snacks = :f, iftar = :f, eventDinner = :f, optionalDinner = :f, workFromHome = :t, updatedAt = :now',
+        ExpressionAttributeValues: { ':f': false, ':t': true, ':now': now },
+      }))
+      if (!record.workFromHome) wfhIncrementIds.push(discordId)
+      filledCount++
+    } else {
+      const updates: string[] = []
+      const values: Record<string, unknown> = { ':now': now }
+
+      const mealFields = [
+        { field: 'lunch',          key: ':lunch',   val: defaults.lunch },
+        { field: 'snacks',         key: ':snacks',  val: defaults.snacks },
+        { field: 'iftar',          key: ':iftar',   val: defaults.iftar },
+        { field: 'eventDinner',    key: ':ed',      val: defaults.eventDinner },
+        { field: 'optionalDinner', key: ':od',      val: defaults.optionalDinner },
+      ] as const
+
+      for (const { field, key, val } of mealFields) {
+        if (record[field] === null && val !== null) {
+          updates.push(`${field} = ${key}`)
+          values[key] = val
+        }
+      }
+
+      if (updates.length) {
+        await dynamo.send(new UpdateCommand({
+          TableName:                 TABLES.MAIN,
+          Key:                       { PK: `USER#${discordId}`, SK: `RECORD#${date}` },
+          UpdateExpression:          `SET ${updates.join(', ')}, updatedAt = :now`,
+          ExpressionAttributeValues: values,
+        }))
+        filledCount++
+      }
+    }
+  }
+
+  if (isGlobalWFH && filledCount) console.log(`Overrode ${filledCount} existing records for global WFH day.`)
+  else if (filledCount)           console.log(`Filled null fields in ${filledCount} existing records.`)
+
+  // 6. Increment WFH counter for users transitioning false → true
+  if (wfhIncrementIds.length) {
+    const currentMonthKey = getCurrentMonthKey()
+    for (const discordId of wfhIncrementIds) {
+      const user = userMap.get(discordId)!
+      const isNewMonth = user.wfhMonth !== currentMonthKey
+      await dynamo.send(new UpdateCommand({
+        TableName:                 TABLES.MAIN,
+        Key:                       { PK: `USER#${discordId}`, SK: 'PROFILE' },
+        UpdateExpression:          'SET wfhCount = :count, wfhMonth = :month, updatedAt = :now',
+        ExpressionAttributeValues: {
+          ':count': isNewMonth ? 1 : user.wfhCount + 1,
+          ':month': currentMonthKey,
+          ':now':   now,
+        },
+      }))
+    }
+    console.log(`Incremented WFH counter for ${wfhIncrementIds.length} users.`)
+  }
+
+  const total = noRecord.length + filledCount
+  console.log(`Done. ${total} records written for ${date}.`)
+
+  await postWebhook(
+    `🌙 **Nightly records created — ${date}**\n` +
+    `✅ New: **${noRecord.length}**  📝 Filled: **${filledCount}**  👥 Total active users: **${discordIds.length}**`
+  )
 
   await writeAuditLog({
     actorDiscordId: 'SYSTEM',
@@ -95,7 +239,7 @@ async function createRecords(): Promise<void> {
     action:         'CREATE',
     entityType:     'MEAL_RECORD',
     entityId:       date,
-    metadata:       { count: discordIds.length },
+    metadata:       { created: noRecord.length, filled: filledCount, date },
   })
 }
 
@@ -106,93 +250,17 @@ async function createRecords(): Promise<void> {
  * and posts a report to the configured Discord channel.
  */
 async function sendHeadcountReport(): Promise<void> {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL
-  if (!webhookUrl) {
-    console.error('DISCORD_WEBHOOK_URL not set — skipping report.')
+  const date = getTodayString()
+  const data = await getHeadcount(date)
+
+  const content = formatHeadcountMessage(data)
+  if (!content) {
+    console.log(`No meal records found for ${date} — skipping report.`)
     return
   }
 
-  // Today's date string
-  const today = new Date()
-  const date  = today.toISOString().slice(0, 10)
-
-  // Get all active users via GSI
-  const gsiResult = await dynamo.send(new QueryCommand({
-    TableName:                 TABLES.MAIN,
-    IndexName:                 'status-email-index',
-    KeyConditionExpression:    '#status = :active',
-    ExpressionAttributeNames:  { '#status': 'status' },
-    ExpressionAttributeValues: { ':active': 'ACTIVE' },
-  }))
-  const activeUsers = (gsiResult.Items ?? []) as UserItem[]
-  if (!activeUsers.length) {
-    console.log('No active users — skipping report.')
-    return
-  }
-
-  const discordIds = activeUsers.map(u => u.discordId)
-
-  // BatchGet today's meal records for all active users (chunks of 100)
-  const records: MealRecordItem[] = []
-  const chunks = chunkArray(discordIds, 100)
-
-  for (const chunk of chunks) {
-    const batchResult = await dynamo.send(new BatchGetCommand({
-      RequestItems: {
-        [TABLES.MAIN]: {
-          Keys: chunk.map(id => ({ PK: `USER#${id}`, SK: `RECORD#${date}` })),
-        },
-      },
-    }))
-    records.push(...((batchResult.Responses?.[TABLES.MAIN] ?? []) as MealRecordItem[]))
-  }
-
-  // Aggregate counts
-  const office = records.filter(r => !r.workFromHome).length
-  const wfh    = records.filter(r => r.workFromHome).length
-  const lunch          = records.filter(r => r.lunch === true).length
-  const snacks         = records.filter(r => r.snacks === true).length
-  const iftar          = records.filter(r => r.iftar === true).length
-  const eventDinner    = records.filter(r => r.eventDinner === true).length
-  const optionalDinner = records.filter(r => r.optionalDinner === true).length
-
-  // Team breakdown
-  const teamMap = new Map<string, { name: string; lunch: number; snacks: number }>()
-  for (const r of records) {
-    if (!r.teamId) continue
-    const entry = teamMap.get(r.teamId) ?? { name: r.teamName ?? r.teamId, lunch: 0, snacks: 0 }
-    if (r.lunch  === true) entry.lunch++
-    if (r.snacks === true) entry.snacks++
-    teamMap.set(r.teamId, entry)
-  }
-
-  const teamLines = [...teamMap.values()]
-    .map(t => `  ${t.name}: Lunch ${t.lunch} | Snacks ${t.snacks}`)
-    .join('\n')
-
-  const message = [
-    `📊 **Daily Headcount — ${date}**`,
-    ``,
-    `🏢 Office: **${office}** | 🏠 WFH: **${wfh}**`,
-    ``,
-    `**Meal Counts:**`,
-    `🍱 Lunch: ${lunch}  🍪 Snacks: ${snacks}  🌙 Iftar: ${iftar}  🍽️ Event Dinner: ${eventDinner}  🥘 Optional Dinner: ${optionalDinner}`,
-    teamLines ? `\n**By Team:**\n${teamLines}` : '',
-  ].filter(Boolean).join('\n')
-
-  // Post to Discord via webhook
-  const response = await fetch(webhookUrl, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ content: message }),
-  })
-
-  if (!response.ok) {
-    const body = await response.text()
-    console.error(`Failed to post headcount report: ${response.status} ${body}`)
-  } else {
-    console.log('Headcount report posted successfully.')
-  }
+  await postWebhook(content)
+  console.log('Headcount report posted successfully.')
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -201,4 +269,40 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = []
   for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size))
   return chunks
+}
+
+async function postWebhook(content: string): Promise<void> {
+  const posts: Promise<void>[] = []
+
+  const discordUrl = process.env.DISCORD_WEBHOOK_URL
+  if (discordUrl) {
+    posts.push(
+      fetch(discordUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ content }),
+      }).then(async r => {
+        if (!r.ok) console.error(`Discord webhook failed: ${r.status} ${await r.text()}`)
+      })
+    )
+  } else {
+    console.warn('DISCORD_WEBHOOK_URL not set — skipping Discord post.')
+  }
+
+  const googleUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL
+  if (googleUrl) {
+    posts.push(
+      fetch(googleUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ text: content }),
+      }).then(async r => {
+        if (!r.ok) console.error(`Google Chat webhook failed: ${r.status} ${await r.text()}`)
+      })
+    )
+  } else {
+    console.warn('GOOGLE_CHAT_WEBHOOK_URL not set — skipping Google Chat post.')
+  }
+
+  await Promise.all(posts)
 }

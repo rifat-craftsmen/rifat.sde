@@ -100,3 +100,42 @@ export async function getHeadcount(date: string): Promise<HeadcountData> {
     occasionName:  schedule?.occasionName ?? null,
   }
 }
+
+/**
+ * Formats a HeadcountData object into a Discord-compatible message string.
+ * Shared by the /headcount command and the SEND_REPORT cron.
+ */
+export function formatHeadcountMessage(data: HeadcountData): string | null {
+  if (data.overallTotal === 0) return null
+
+  const occasionLine = data.occasionName ? ` — *${data.occasionName}*` : ''
+  const { mealTotals: m, workLocationSplit: w } = data
+
+  const mealLine = [
+    m.lunch          > 0 && `🍱 Lunch: **${m.lunch}**`,
+    m.snacks         > 0 && `🍪 Snacks: **${m.snacks}**`,
+    m.iftar          > 0 && `🌙 Iftar: **${m.iftar}**`,
+    m.eventDinner    > 0 && `🍽️ Event Dinner: **${m.eventDinner}**`,
+    m.optionalDinner > 0 && `🥘 Optional Dinner: **${m.optionalDinner}**`,
+  ].filter(Boolean).join('  ') || 'No meals opted in.'
+
+  const teamLines = data.teamBreakdown.map(t => {
+    const meals = [
+      t.lunch          > 0 && `L:${t.lunch}`,
+      t.snacks         > 0 && `S:${t.snacks}`,
+      t.iftar          > 0 && `I:${t.iftar}`,
+      t.eventDinner    > 0 && `ED:${t.eventDinner}`,
+      t.optionalDinner > 0 && `OD:${t.optionalDinner}`,
+    ].filter(Boolean).join(' ') || 'none'
+    return `  **${t.teamName}** (${t.totalMembers}) — ${meals}`
+  })
+
+  return [
+    `📊 **Headcount — ${data.date}**${occasionLine}`,
+    ``,
+    `🏢 Office: **${w.office}**  🏠 WFH: **${w.wfh}**  👥 Total: **${data.overallTotal}**`,
+    ``,
+    mealLine,
+    teamLines.length > 0 ? `\n**By team:**\n${teamLines.join('\n')}` : '',
+  ].filter(s => s !== '').join('\n')
+}
