@@ -21,16 +21,20 @@ function formatDay(day: ScheduleDay): string {
   const label   = `${weekday}, ${dayMonth}`
   const prefix  = day.isToday ? '**Today** ' : ''
 
+  const isGlobalWFH   = !!day.globalWFH
+  const isPersonalWFH = !!day.record?.workFromHome
+
   const mealCols = MEALS.map((m, i) => {
     const enabled = day.schedule?.[m.key] as boolean | undefined
-    if (!enabled) return '➖'                        // meal not offered
-    const chosen = day.record?.[MEAL_RECORD_KEYS[i]] // true | false | null | undefined
+    if (!enabled || isGlobalWFH) return '➖'          // meal not offered
+    if (isPersonalWFH) return `${m.label} ❌`         // available but skipped (WFH)
+    const chosen = day.record?.[MEAL_RECORD_KEYS[i]]  // true | false | null | undefined
     if (chosen === true)  return `${m.label} ✅`
     if (chosen === false) return `${m.label} ❌`
-    return `${m.label} ◽`                            // not set yet
+    return `${m.label} ◽`                             // not set yet
   }).join('  ')
 
-  const wfh = (day.record?.workFromHome || day.globalWFH) ? '  🏠' : ''
+  const wfh = (isGlobalWFH || isPersonalWFH) ? '  🏠' : ''
   return `${prefix}${label} =>  ${mealCols}${wfh}`
 }
 

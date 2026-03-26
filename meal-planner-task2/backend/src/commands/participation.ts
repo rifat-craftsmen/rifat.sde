@@ -34,7 +34,9 @@ export async function handleParticipation(req: AuthRequest, res: Response): Prom
     return
   }
 
-  const scopeLabel = role === 'LEAD' ? ' *(your team)*' : ''
+  const scopeLabel = role === 'LEAD'
+    ? ` — *${data.employees[0]?.teamName ?? 'your team'}*`
+    : ''
   const header     = `👥 **Participation — ${date}**${scopeLabel}\n`
 
   const lines = data.employees.map(e => {
@@ -47,8 +49,8 @@ export async function handleParticipation(req: AuthRequest, res: Response): Prom
       e.meals.optionalDinner === true  ? 'OD ✅' : e.meals.optionalDinner === false ? 'OD ❌' : '',
     ].filter(Boolean).join('  ') || '—'
 
-    const team = e.teamName ? ` *[${e.teamName}]*` : ''
-    return `${wfh} **${e.name}**${team} — ${meals}  WFH: ${e.wfhCount}`
+    const team = role === 'ADMIN' && e.teamName ? ` *[${e.teamName}]*` : ''
+    return `${wfh} **${e.name}**${team} — ${meals}  **WFH:** ${e.wfhCount}`
   })
 
   res.json({
