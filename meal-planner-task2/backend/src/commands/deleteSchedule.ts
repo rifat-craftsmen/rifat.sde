@@ -17,6 +17,10 @@ export async function handleDeleteSchedule(req: AuthRequest, res: Response): Pro
     return
   }
 
-  await deleteMealScheduleWithAudit(date, req.user!.discordId)
-  res.json({ type: 4, data: { content: `Schedule for **${date}** deleted.`, flags: 64 } })
+  try {
+    await deleteMealScheduleWithAudit(date, req.user!.discordId)
+    res.json({ type: 4, data: { content: `Schedule for **${date}** deleted.`, flags: 64 } })
+  } catch (err: any) {
+    res.json({ type: 4, data: { content: err.message ?? 'Failed to delete schedule.', flags: 64 } })
+  }
 }
