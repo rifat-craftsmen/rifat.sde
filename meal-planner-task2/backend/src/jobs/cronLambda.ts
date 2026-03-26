@@ -230,7 +230,7 @@ async function createRecords(): Promise<void> {
 
   await postWebhook(
     `🌙 **Nightly records created — ${date}**\n` +
-    `✅ New: **${noRecord.length}**  📝 Filled: **${filledCount}**  👥 Total active users: **${discordIds.length}**`
+    `✔ New: **${noRecord.length}**  📝 Filled: **${filledCount}**  👥 Total active users: **${discordIds.length}**`
   )
 
   await writeAuditLog({

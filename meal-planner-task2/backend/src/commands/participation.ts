@@ -38,17 +38,17 @@ export async function handleParticipation(req: AuthRequest, res: Response): Prom
   const header     = `👥 **Participation — ${date}**${scopeLabel}\n`
 
   const lines = data.employees.map(e => {
-    const wfh  = e.workFromHome ? '🏠' : '🏢'
+    const wfh  = e.workFromHome ? '🏠' : '🏛️'
     const meals = [
-      e.meals.lunch          === true  ? 'L:✅' : e.meals.lunch          === false ? 'L:❌' : '',
-      e.meals.snacks         === true  ? 'S:✅' : e.meals.snacks         === false ? 'S:❌' : '',
-      e.meals.iftar          === true  ? 'I:✅' : e.meals.iftar          === false ? 'I:❌' : '',
-      e.meals.eventDinner    === true  ? 'ED:✅': e.meals.eventDinner    === false ? 'ED:❌': '',
-      e.meals.optionalDinner === true  ? 'OD:✅': e.meals.optionalDinner === false ? 'OD:❌': '',
+      e.meals.lunch          === true  ? 'L ✅'  : e.meals.lunch          === false ? 'L ❌'  : '',
+      e.meals.snacks         === true  ? 'S ✅'  : e.meals.snacks         === false ? 'S ❌'  : '',
+      e.meals.iftar          === true  ? 'I ✅'  : e.meals.iftar          === false ? 'I ❌'  : '',
+      e.meals.eventDinner    === true  ? 'ED ✅' : e.meals.eventDinner    === false ? 'ED ❌' : '',
+      e.meals.optionalDinner === true  ? 'OD ✅' : e.meals.optionalDinner === false ? 'OD ❌' : '',
     ].filter(Boolean).join('  ') || '—'
 
     const team = e.teamName ? ` *[${e.teamName}]*` : ''
-    return `${wfh} **${e.name}**${team} — ${meals}  WFH/mo: ${e.wfhCount}`
+    return `${wfh} **${e.name}**${team} — ${meals}  WFH: ${e.wfhCount}`
   })
 
   res.json({

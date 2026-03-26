@@ -41,18 +41,18 @@
   status: ACTIVE
   teamId: team-alpha
 
-- discordId: "1071390812547580005"
-  name: Niloy Gabriel
-  email: niloy.gabriel@craftsmensoftware.com
+- discordId: "1467742734449377402"
+  name: Samin Yasar
+  email: samin.yasar@craftsmensoftware.com
   role: EMPLOYEE
   status: ACTIVE
   teamId: team-alpha
 
 # ── Team Beta ─────────────────────────────────────────────────────────────────
 
-- discordId: "1467742734449377402"
-  name: Samin Yasar
-  email: samin.yasar@craftsmensoftware.com
+- discordId: "1071390812547580005"
+  name: Niloy Gabriel
+  email: niloy.gabriel@craftsmensoftware.com
   role: LEAD
   status: ACTIVE
   teamId: team-beta

@@ -133,7 +133,7 @@ export function formatHeadcountMessage(data: HeadcountData): string | null {
   return [
     `📊 **Headcount — ${data.date}**${occasionLine}`,
     ``,
-    `🏢 Office: **${w.office}**  🏠 WFH: **${w.wfh}**  👥 Total: **${data.overallTotal}**`,
+    `🏛️ Office: **${w.office}**  🏠 WFH: **${w.wfh}**  👥 Total: **${data.overallTotal}**`,
     ``,
     mealLine,
     teamLines.length > 0 ? `\n**By team:**\n${teamLines.join('\n')}` : '',

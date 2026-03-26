@@ -3,6 +3,8 @@ import { AuthRequest } from '../types/index.js'
 import { getTeamMembers, getAllActiveMembers } from '../services/teamService.js'
 import type { TeamMemberView } from '../services/teamService.js'
 
+const WFH_MONTHLY_LIMIT = 5
+
 export async function handleTeamMembers(req: AuthRequest, res: Response): Promise<void> {
   const user = req.user!
 
@@ -24,7 +26,8 @@ export async function handleTeamMembers(req: AuthRequest, res: Response): Promis
 
     const lines = members.map(m => {
       const status = m.status === 'ACTIVE' ? '🟢' : '🔴'
-      return `${status} **${m.name}** *[${m.teamName}]* — WFH this month: ${m.wfhCount}`
+      const wfhLabel = m.wfhCount > WFH_MONTHLY_LIMIT ? `${m.wfhCount} ⚠️` : `${m.wfhCount}`
+      return `${status} **${m.name}** *[${m.teamName}]* — WFH: ${wfhLabel}`
     })
 
     const content = `👥 **All Employees** *(${members.length} active) — ${month}*\n\n${lines.join('\n')}`
@@ -47,7 +50,8 @@ export async function handleTeamMembers(req: AuthRequest, res: Response): Promis
 
   const lines = members.map((m: TeamMemberView) => {
     const status = m.status === 'ACTIVE' ? '🟢' : '🔴'
-    return `${status} **${m.name}** — WFH this month: ${m.wfhCount}`
+    const wfhLabel = m.wfhCount > WFH_MONTHLY_LIMIT ? `${m.wfhCount} ⚠️` : `${m.wfhCount}`
+    return `${status} **${m.name}** — WFH: ${wfhLabel}`
   })
 
   const content = `👥 **${teamName}** *(${members.length} member${members.length === 1 ? '' : 's'}) — ${month}*\n\n${lines.join('\n')}`
