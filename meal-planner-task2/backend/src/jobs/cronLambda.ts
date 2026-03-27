@@ -112,9 +112,6 @@ async function createRecords(): Promise<void> {
 
   if (isGlobalWFH) console.log(`Global WFH period active for ${date} — all meals disabled, WFH = true.`)
 
-  // Track users whose WFH goes false → true (need counter increment)
-  const wfhIncrementIds: string[] = []
-
   const noRecord  = discordIds.filter(id => !existingByUser.has(id))
   const hasRecord = discordIds.filter(id =>  existingByUser.has(id))
 
@@ -152,7 +149,6 @@ async function createRecords(): Promise<void> {
       }))
     }
     console.log(`Created ${noRecord.length} new records.`)
-    if (isGlobalWFH) wfhIncrementIds.push(...noRecord)
   }
 
   // 5. For existing records:
@@ -169,7 +165,6 @@ async function createRecords(): Promise<void> {
         UpdateExpression:          'SET lunch = :f, snacks = :f, iftar = :f, eventDinner = :f, optionalDinner = :f, workFromHome = :t, updatedAt = :now',
         ExpressionAttributeValues: { ':f': false, ':t': true, ':now': now },
       }))
-      if (!record.workFromHome) wfhIncrementIds.push(discordId)
       filledCount++
     } else {
       const updates: string[] = []
@@ -205,25 +200,6 @@ async function createRecords(): Promise<void> {
   if (isGlobalWFH && filledCount) console.log(`Overrode ${filledCount} existing records for global WFH day.`)
   else if (filledCount)           console.log(`Filled null fields in ${filledCount} existing records.`)
 
-  // 6. Increment WFH counter for users transitioning false → true
-  if (wfhIncrementIds.length) {
-    const currentMonthKey = getCurrentMonthKey()
-    for (const discordId of wfhIncrementIds) {
-      const user = userMap.get(discordId)!
-      const isNewMonth = user.wfhMonth !== currentMonthKey
-      await dynamo.send(new UpdateCommand({
-        TableName:                 TABLES.MAIN,
-        Key:                       { PK: `USER#${discordId}`, SK: 'PROFILE' },
-        UpdateExpression:          'SET wfhCount = :count, wfhMonth = :month, updatedAt = :now',
-        ExpressionAttributeValues: {
-          ':count': isNewMonth ? 1 : user.wfhCount + 1,
-          ':month': currentMonthKey,
-          ':now':   now,
-        },
-      }))
-    }
-    console.log(`Incremented WFH counter for ${wfhIncrementIds.length} users.`)
-  }
 
   const total = noRecord.length + filledCount
   console.log(`Done. ${total} records written for ${date}.`)
