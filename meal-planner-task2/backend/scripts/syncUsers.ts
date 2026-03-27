@@ -48,6 +48,15 @@ async function syncUsers() {
   const now      = new Date().toISOString()
   const wfhMonth = getCurrentMonthKey()
 
+  // Build desired memberIds per team (ACTIVE users only) from yaml
+  const desiredMembers = new Map<string, Set<string>>()
+  for (const team of teams) desiredMembers.set(team.teamId, new Set())
+  for (const user of users) {
+    if (user.teamId && user.status === 'ACTIVE') {
+      desiredMembers.get(user.teamId)?.add(user.discordId)
+    }
+  }
+
   for (const user of users) {
     const teamName = user.teamId ? (teamMap.get(user.teamId) ?? undefined) : undefined
 
@@ -74,26 +83,27 @@ async function syncUsers() {
     }))
 
     console.log(`  ✓ ${user.discordId}  ${user.name.padEnd(20)} [${user.role}] [${user.status}]`)
+  }
 
-    // ── Sync team membership (discordId-based StringSet) ───────────────────
-    if (user.teamId) {
-      if (user.status === 'ACTIVE') {
-        await dynamo.send(new UpdateCommand({
-          TableName:                 TABLES.MAIN,
-          Key:                       { PK: 'TEAM', SK: user.teamId },
-          UpdateExpression:          'ADD memberIds :did',
-          ExpressionAttributeValues: { ':did': new Set([user.discordId]) },
-        }))
-      } else {
-        await dynamo.send(new UpdateCommand({
-          TableName:                 TABLES.MAIN,
-          Key:                       { PK: 'TEAM', SK: user.teamId },
-          UpdateExpression:          'DELETE memberIds :did',
-          ExpressionAttributeValues: { ':did': new Set([user.discordId]) },
-        }))
-      }
+  // ── Full-replace memberIds per team ────────────────────────────────────
+  // Overwrites the entire set so removed/deleted users don't linger.
+  console.log('\nSyncing team memberships...\n')
+  for (const [teamId, memberIds] of desiredMembers) {
+    if (memberIds.size > 0) {
+      await dynamo.send(new UpdateCommand({
+        TableName:                 TABLES.MAIN,
+        Key:                       { PK: 'TEAM', SK: teamId },
+        UpdateExpression:          'SET memberIds = :ids',
+        ExpressionAttributeValues: { ':ids': memberIds },
+      }))
+    } else {
+      await dynamo.send(new UpdateCommand({
+        TableName:                 TABLES.MAIN,
+        Key:                       { PK: 'TEAM', SK: teamId },
+        UpdateExpression:          'REMOVE memberIds',
+      }))
     }
-
+    console.log(`  ✓ ${teamId}  [${memberIds.size} active member(s)]`)
   }
 
   console.log('\nDone.\n')

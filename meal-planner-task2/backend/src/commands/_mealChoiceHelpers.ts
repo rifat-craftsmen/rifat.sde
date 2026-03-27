@@ -1,7 +1,7 @@
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import { AuthRequest, MealUpdateData, MealScheduleItem } from '../types/index.js'
-import { getTodayString, isWeekend, isDateInValidWindow } from '../utils/dateHelpers.js'
+import { getTodayString, isWeekend, isDateInValidWindow, MEAL_WINDOW_WEEKDAYS } from '../utils/dateHelpers.js'
 
 const DEFAULT_SCHEDULE = {
   lunchEnabled:          true,
@@ -76,6 +76,6 @@ export function validateMealDate(date: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date))  return 'Invalid date format. Use YYYY-MM-DD.'
   if (date <= getTodayString())             return "Cannot set meals for today or a past date. Today's record is locked."
   if (isWeekend(date))                     return 'Cannot set meals for weekends (Sat/Sun).'
-  if (!isDateInValidWindow(date))          return 'Date is outside the 7-weekday booking window.'
+  if (!isDateInValidWindow(date))          return `Date is outside the ${MEAL_WINDOW_WEEKDAYS}-weekday booking window.`
   return null
 }
