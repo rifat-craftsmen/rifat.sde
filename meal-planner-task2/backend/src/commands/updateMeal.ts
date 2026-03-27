@@ -6,7 +6,7 @@ import { parseMealOptions, validateMealDate } from './_mealChoiceHelpers.js'
 export async function handleUpdateMeal(req: AuthRequest, res: Response): Promise<void> {
   const data = await parseMealOptions(req)
 
-  const err = validateMealDate(data.date)
+  const err = await validateMealDate(data.date)
   if (err) {
     res.json({ type: 4, data: { content: err, flags: 64 } })
     return
