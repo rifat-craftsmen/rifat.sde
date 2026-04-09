@@ -111,12 +111,15 @@ export function formatHeadcountMessage(data: HeadcountData): string | null {
   const occasionLine = data.occasionName ? ` — *${data.occasionName}*` : ''
   const { mealTotals: m, workLocationSplit: w } = data
 
+  const totalMeals = m.lunch + m.snacks + m.iftar + m.eventDinner + m.optionalDinner
+
   const mealLine = [
     m.lunch          > 0 && `🍱 Lunch: **${m.lunch}**`,
     m.snacks         > 0 && `🍪 Snacks: **${m.snacks}**`,
     m.iftar          > 0 && `🌙 Iftar: **${m.iftar}**`,
     m.eventDinner    > 0 && `🍽️ Event Dinner: **${m.eventDinner}**`,
     m.optionalDinner > 0 && `🥘 Optional Dinner: **${m.optionalDinner}**`,
+    `🧾 Total: **${totalMeals}**`,
   ].filter(Boolean).join('  ') || 'No meals opted in.'
 
   const teamLines = data.teamBreakdown.map(t => {
@@ -133,7 +136,7 @@ export function formatHeadcountMessage(data: HeadcountData): string | null {
   return [
     `📊 **Headcount — ${data.date}**${occasionLine}`,
     ``,
-    `🏢 Office: **${w.office}**  🏠 WFH: **${w.wfh}**  👥 Total: **${data.overallTotal}**`,
+    `🏛️ Office: **${w.office}**  🏠 WFH: **${w.wfh}**`,
     ``,
     mealLine,
     teamLines.length > 0 ? `\n**By team:**\n${teamLines.join('\n')}` : '',

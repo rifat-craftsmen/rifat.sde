@@ -2,6 +2,7 @@ import { PutCommand, QueryCommand, UpdateCommand, DeleteCommand } from '@aws-sdk
 import { randomUUID } from 'node:crypto'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import { writeAuditLog } from './auditService.js'
+import { isDateInPeriod } from '../utils/dateHelpers.js'
 import type { WfhPeriodItem, CreateWfhPeriodData, UpdateWfhPeriodData } from '../types/index.js'
 
 export async function createWfhPeriod(
@@ -47,6 +48,11 @@ export async function listWfhPeriods(): Promise<WfhPeriodItem[]> {
     ExpressionAttributeValues: { ':pk': 'WFHPERIOD' },
   }))
   return (result.Items ?? []) as WfhPeriodItem[]
+}
+
+export async function isDateInAnyWfhPeriod(date: string): Promise<boolean> {
+  const periods = await listWfhPeriods()
+  return periods.some(p => isDateInPeriod(date, p.dateFrom, p.dateTo))
 }
 
 async function findById(id: string): Promise<WfhPeriodItem | undefined> {

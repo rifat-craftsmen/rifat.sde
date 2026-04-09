@@ -75,6 +75,6 @@ export async function handleBulkUpdate(req: AuthRequest, res: Response): Promise
   const count = await applyBulkAction(memberIds, date, action as BulkAction, user.discordId)
 
   const label = ACTION_LABELS[action as BulkAction]
-  const msg   = `✅ **${label}** on **${date}**. (${count}/${memberIds.length} records updated)`
+  const msg   = `✔ **${label}** on **${date}**. (${count}/${memberIds.length} records updated)`
   res.json(isGoogle ? { text: msg } : { type: 4, data: { content: msg, flags: 64 } })
 }

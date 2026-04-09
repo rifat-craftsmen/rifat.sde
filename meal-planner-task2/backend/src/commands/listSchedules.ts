@@ -3,6 +3,11 @@ import { AuthRequest } from '../types/index.js'
 import { getAllMealSchedules } from '../services/adminService.js'
 
 export async function handleListSchedules(_req: AuthRequest, res: Response): Promise<void> {
+  if (_req.user!.role !== 'ADMIN') {
+    res.json({ type: 4, data: { content: 'Only admins can view meal schedules.', flags: 64 } })
+    return
+  }
+
   const schedules = await getAllMealSchedules()
 
   if (schedules.length === 0) {

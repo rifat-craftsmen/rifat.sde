@@ -5,6 +5,7 @@ import {
   getNextNWeekdays,
   isDateInPeriod,
   getCurrentMonthKey,
+  MEAL_WINDOW_WEEKDAYS,
 } from '../utils/dateHelpers.js'
 import { writeAuditLog } from './auditService.js'
 import type { MealRecordItem, MealScheduleItem, WfhPeriodItem, ScheduleDay, MealUpdateData, UserItem } from '../types/index.js'
@@ -35,6 +36,12 @@ export async function createOrUpdateMealRecord(
   const prevWfh = existing?.workFromHome ?? false
   const newWfh  = data.workFromHome !== undefined ? data.workFromHome : prevWfh
 
+  // When WFH transitions (false→true or true→false), unspecified meals reset to null
+  // so stale selections don't silently persist across WFH state changes.
+  const wfhTransition = data.workFromHome !== undefined && data.workFromHome !== prevWfh
+  const carry = <T>(incoming: T | undefined, stored: T | null | undefined): T | null =>
+    incoming !== undefined ? incoming : (wfhTransition ? null : (stored ?? null))
+
   // 4. Upsert the meal record (carry forward existing meal fields for omitted options)
   await dynamo.send(new PutCommand({
     TableName: TABLES.MAIN,
@@ -43,11 +50,11 @@ export async function createOrUpdateMealRecord(
       SK:             `RECORD#${data.date}`,
       discordId,
       date:           data.date,
-      lunch:          data.lunch          !== undefined ? data.lunch          : (existing?.lunch          ?? null),
-      snacks:         data.snacks         !== undefined ? data.snacks         : (existing?.snacks         ?? null),
-      iftar:          data.iftar          !== undefined ? data.iftar          : (existing?.iftar          ?? null),
-      eventDinner:    data.eventDinner    !== undefined ? data.eventDinner    : (existing?.eventDinner    ?? null),
-      optionalDinner: data.optionalDinner !== undefined ? data.optionalDinner : (existing?.optionalDinner ?? null),
+      lunch:          carry(data.lunch,          existing?.lunch),
+      snacks:         carry(data.snacks,         existing?.snacks),
+      iftar:          carry(data.iftar,          existing?.iftar),
+      eventDinner:    carry(data.eventDinner,    existing?.eventDinner),
+      optionalDinner: carry(data.optionalDinner, existing?.optionalDinner),
       workFromHome:   newWfh,
       teamId:         user.teamId,
       teamName:       user.teamName,
@@ -119,7 +126,7 @@ const DEFAULT_SCHEDULE = {
  */
 export async function getMySchedule(discordId: string): Promise<ScheduleDay[]> {
   const today   = getTodayString()
-  const dates   = getNextNWeekdays(7)   // next 7 weekdays starting today
+  const dates   = getNextNWeekdays(MEAL_WINDOW_WEEKDAYS)
   const endDate = dates[dates.length - 1]
 
   // 1. Query user's meal records for the weekday range

@@ -15,21 +15,27 @@ const MEALS: Array<{ key: keyof MealScheduleItem; label: string }> = [
 const MEAL_RECORD_KEYS = ['lunch', 'snacks', 'iftar', 'eventDinner', 'optionalDinner'] as const
 
 function formatDay(day: ScheduleDay): string {
-  const date   = new Date(day.date + 'T00:00:00Z')
-  const label  = date.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })
-  const prefix = day.isToday ? '**Today** ' : ''
+  const date     = new Date(day.date + 'T00:00:00Z')
+  const weekday  = date.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' })
+  const dayMonth = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' })
+  const label    = `${weekday}, ${dayMonth}`
+  const prefix   = day.isToday ? '**Today** ' : ''
+
+  const isGlobalWFH   = !!day.globalWFH
+  const isPersonalWFH = !!day.record?.workFromHome
 
   const mealCols = MEALS.map((m, i) => {
     const enabled = day.schedule?.[m.key] as boolean | undefined
-    if (!enabled) return '➖'
+    if (!enabled || isGlobalWFH) return '➖'          // meal not offered
+    if (isPersonalWFH) return `${m.label} ❌`         // available but skipped (WFH)
     const chosen = day.record?.[MEAL_RECORD_KEYS[i]]
-    if (chosen === true)  return `${m.label}:✅`
-    if (chosen === false) return `${m.label}:❌`
-    return `${m.label}:⬜`
+    if (chosen === true)  return `${m.label} ✅`
+    if (chosen === false) return `${m.label} ❌`
+    return `${m.label} ◽`
   }).join('  ')
 
-  const wfh = (day.record?.workFromHome || day.globalWFH) ? '  🏠' : ''
-  return `${prefix}${label}  ${mealCols}${wfh}`
+  const wfh = (isGlobalWFH || isPersonalWFH) ? '  🏠' : ''
+  return `${prefix}${label} =>  ${mealCols}${wfh}`
 }
 
 export async function handleEmployeeSchedule(req: AuthRequest, res: Response): Promise<void> {
@@ -86,7 +92,7 @@ export async function handleEmployeeSchedule(req: AuthRequest, res: Response): P
   const days = await getMySchedule(targetId)
 
   const lines  = days.map(formatDay)
-  const legend = '*✅ opted in  ❌ opted out  ⬜ not set  ➖ not offered  🏠 WFH*'
+  const legend = '*✅ opted in   ❌ opted out   ◽ not set   ➖ not offered   🏠 WFH*'
 
   res.json({
     type: 4,

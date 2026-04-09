@@ -38,7 +38,7 @@ export async function handleCreateEmployeeMeal(req: AuthRequest, res: Response):
   }
 
   const data = await parseProxyMealOptions(req)
-  const err  = validateMealDate(data.date)
+  const err  = await validateMealDate(data.date)
   if (err) {
     res.json(isGoogle ? { text: err } : { type: 4, data: { content: err, flags: 64 } })
     return

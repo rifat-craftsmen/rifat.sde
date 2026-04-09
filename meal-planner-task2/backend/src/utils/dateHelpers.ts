@@ -1,5 +1,10 @@
 import { addDays, format } from 'date-fns'
 
+// ── Config ────────────────────────────────────────────────────────────────
+
+// Number of weekdays ahead users can set/view meals (change here to resize the window)
+export const MEAL_WINDOW_WEEKDAYS = 7
+
 // ── Core helpers ──────────────────────────────────────────────────────────
 
 // Returns today as a UTC Date at midnight
@@ -42,9 +47,9 @@ export const getNextNWeekdays = (n: number, from: Date = getUTCToday()): string[
   return weekdays
 }
 
-// 7-weekday window starting from today (Mon–Fri only)
+// Valid booking window starting from today (Mon–Fri only)
 export const getValidDateRange = (): { start: string; end: string } => {
-  const weekdays = getNextNWeekdays(7)
+  const weekdays = getNextNWeekdays(MEAL_WINDOW_WEEKDAYS)
   return { start: weekdays[0], end: weekdays[weekdays.length - 1] }
 }
 
