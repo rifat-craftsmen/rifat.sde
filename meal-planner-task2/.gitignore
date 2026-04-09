@@ -3,3 +3,9 @@ dist/
 .env
 scripts/.test-keypair.json
 data/shared-local-instance.db
+terraform.tfvars
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+terraform-config-dump/
