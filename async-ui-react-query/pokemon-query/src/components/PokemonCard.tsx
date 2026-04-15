@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { PokemonSummary } from '../types/pokemon';
 
 interface Props {
@@ -6,9 +6,12 @@ interface Props {
 }
 
 export function PokemonCard({ pokemon }: Props) {
+  const [searchParams] = useSearchParams();
+  const tab = searchParams.get('tab') ?? 'raw';
+
   return (
     <Link
-      to={`/pokemon/${pokemon.id}`}
+      to={`/pokemon/${pokemon.id}?tab=${tab}`}
       className="bg-white rounded-2xl p-5 flex flex-col items-center gap-3 shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-200 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group"
     >
       <div className="w-32 h-32 relative">

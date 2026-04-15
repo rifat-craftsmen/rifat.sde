@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { fetchPokemonDetail } from '../lib/api';
 import type { PokemonDetail } from '../types/pokemon';
 
@@ -46,6 +46,8 @@ function StatBar({ name, value }: { name: string; value: number }) {
 
 export function DetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const tab = searchParams.get('tab') ?? 'raw';
 
   const { data, isLoading, isError, error, refetch } = useQuery<PokemonDetail>({
     queryKey: ['pokemon', id],
@@ -58,7 +60,7 @@ export function DetailPage() {
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Link
-          to="/"
+          to={`/?tab=${tab}`}
           className="inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 transition-colors mb-6 font-medium"
         >
           ← Back to Pokédex

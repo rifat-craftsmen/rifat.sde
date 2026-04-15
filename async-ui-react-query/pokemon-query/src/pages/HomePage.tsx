@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { RawFetchView } from './RawFetchView';
 import { ReactQueryView } from './ReactQueryView';
 
@@ -10,7 +10,12 @@ const TABS: { id: Tab; label: string; emoji: string }[] = [
 ];
 
 export function HomePage() {
-  const [tab, setTab] = useState<Tab>('raw');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = (searchParams.get('tab') as Tab) ?? 'raw';
+
+  function setTab(id: Tab) {
+    setSearchParams({ tab: id });
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">

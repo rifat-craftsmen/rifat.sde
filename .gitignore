@@ -2,3 +2,5 @@ node_modules
 gacp.sh
 exp/
 meal-planner-task2/
+.vercel
+.env*.local
