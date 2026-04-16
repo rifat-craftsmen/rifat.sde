@@ -2,10 +2,16 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
-        AWS_DEFAULT_REGION    = 'ap-southeast-1'
+        AWS_ACCESS_KEY_ID           = credentials('aws-access-key-id')
+        AWS_SECRET_ACCESS_KEY       = credentials('aws-secret-access-key')
+        AWS_DEFAULT_REGION          = 'ap-southeast-1'
+        TF_VAR_discord_public_key       = credentials('TF_VAR_discord_public_key')
+        TF_VAR_google_chat_app_id       = credentials('TF_VAR_google_chat_app_id')
+        TF_VAR_discord_webhook_url      = credentials('TF_VAR_discord_webhook_url')
+        TF_VAR_google_chat_webhook_url  = credentials('TF_VAR_google_chat_webhook_url')
+        TF_VAR_dynamodb_table_name      = credentials('TF_VAR_dynamodb_table_name')
     }
+
 
     stages {
         stage('Checkout') {
