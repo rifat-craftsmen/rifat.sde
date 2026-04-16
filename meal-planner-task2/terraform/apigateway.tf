@@ -71,10 +71,12 @@ resource "aws_apigatewayv2_stage" "default" {
   name        = "$default"
   auto_deploy = true
 
-  access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
-    format          = "{\"requestId\":\"$context.requestId\",\"path\":\"$context.path\",\"status\":\"$context.status\",\"error\":\"$context.error.message\"}\n"
-  }
+  # access_log_settings disabled due to IAM permission restrictions
+  # (logs:CreateLogDelivery denied by MFA enforcement policy)
+  # access_log_settings {
+  #   destination_arn = aws_cloudwatch_log_group.api_gateway.arn
+  #   format          = "{\"requestId\":\"$context.requestId\",\"path\":\"$context.path\",\"status\":\"$context.status\",\"error\":\"$context.error.message\"}\n"
+  # }
 }
 
 # ─── Lambda Permissions ───────────────────────────────────────────────────────
