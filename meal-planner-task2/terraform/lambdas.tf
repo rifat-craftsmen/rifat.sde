@@ -14,6 +14,10 @@ resource "aws_lambda_function" "discord_authorizer" {
   memory_size   = 128
   architectures = ["x86_64"]
 
+  image_config {
+    command = ["lambda.handler"]
+  }
+
   environment {
     variables = {
       DISCORD_PUBLIC_KEY = var.discord_public_key
@@ -38,6 +42,10 @@ resource "aws_lambda_function" "discord_main" {
   timeout       = 30
   memory_size   = 512
   architectures = ["x86_64"]
+
+  image_config {
+    command = ["lambda.handler"]
+  }
 
   environment {
     variables = {
@@ -65,6 +73,10 @@ resource "aws_lambda_function" "google_authorizer" {
   memory_size   = 256
   architectures = ["x86_64"]
 
+  image_config {
+    command = ["googleLambda.handler"]
+  }
+
   environment {
     variables = {
       GOOGLE_CHAT_APP_ID = var.google_chat_app_id
@@ -89,6 +101,10 @@ resource "aws_lambda_function" "google_main" {
   timeout       = 30
   memory_size   = 256
   architectures = ["x86_64"]
+
+  image_config {
+    command = ["googleLambda.handler"]
+  }
 
   environment {
     variables = {
@@ -115,6 +131,10 @@ resource "aws_lambda_function" "cron" {
   timeout       = 30
   memory_size   = 256
   architectures = ["x86_64"]
+
+  image_config {
+    command = ["lambda.handler"]
+  }
 
   environment {
     variables = {
