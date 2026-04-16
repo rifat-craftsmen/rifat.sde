@@ -12,7 +12,6 @@ pipeline {
         TF_VAR_dynamodb_table_name      = credentials('TF_VAR_dynamodb_table_name')
     }
 
-
     stages {
         stage('Checkout') {
             steps {
@@ -22,7 +21,7 @@ pipeline {
 
         stage('Build Backend') {
             steps {
-                dir('backend') {
+                dir('meal-planner-task2/backend') {
                     sh 'npm ci'
                     sh 'npm run build'
                 }
@@ -31,7 +30,7 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                dir('terraform') {
+                dir('meal-planner-task2/terraform') {
                     sh 'terraform init'
                 }
             }
@@ -39,7 +38,7 @@ pipeline {
 
         stage('Terraform Plan') {
             steps {
-                dir('terraform') {
+                dir('meal-planner-task2/terraform') {
                     sh 'terraform plan -out=tfplan'
                 }
             }
@@ -53,7 +52,7 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                dir('terraform') {
+                dir('meal-planner-task2/terraform') {
                     sh 'terraform apply -auto-approve tfplan'
                 }
             }
