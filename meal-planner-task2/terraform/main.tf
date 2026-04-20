@@ -8,7 +8,7 @@ terraform {
 
   backend "s3" {
     bucket = "trainee-rifat-mhpv2-tfstate"
-    key    = "meal-planner-task2/terraform.tfstate"
+    key = "meal-planner-task2/terraform-v2.tfstate"
     region = "ap-southeast-1"
   }
 }

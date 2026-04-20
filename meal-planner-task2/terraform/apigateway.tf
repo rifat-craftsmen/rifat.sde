@@ -14,7 +14,7 @@ resource "aws_apigatewayv2_api" "main" {
 resource "aws_apigatewayv2_authorizer" "google" {
   api_id                            = aws_apigatewayv2_api.main.id
   authorizer_type                   = "REQUEST"
-  name                              = "google-authorizer"
+  name                              = "google-authorizer-v2"
   authorizer_uri                    = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${aws_lambda_function.google_authorizer.arn}/invocations"
   authorizer_payload_format_version = "2.0"
   authorizer_result_ttl_in_seconds  = 0
@@ -71,12 +71,10 @@ resource "aws_apigatewayv2_stage" "default" {
   name        = "$default"
   auto_deploy = true
 
-  # access_log_settings disabled due to IAM permission restrictions
-  # (logs:CreateLogDelivery denied by MFA enforcement policy)
-  # access_log_settings {
-  #   destination_arn = aws_cloudwatch_log_group.api_gateway.arn
-  #   format          = "{\"requestId\":\"$context.requestId\",\"path\":\"$context.path\",\"status\":\"$context.status\",\"error\":\"$context.error.message\"}\n"
-  # }
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
+    format          = "{\"requestId\":\"$context.requestId\",\"path\":\"$context.path\",\"status\":\"$context.status\",\"error\":\"$context.error.message\"}\n"
+  }
 }
 
 # ─── Lambda Permissions ───────────────────────────────────────────────────────

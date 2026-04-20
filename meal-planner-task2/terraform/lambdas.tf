@@ -15,7 +15,7 @@ resource "aws_lambda_function" "discord_authorizer" {
   architectures = ["x86_64"]
 
   image_config {
-    command = ["lambda.handler"]
+    command = ["discordAuthorizer.handler"]
   }
 
   environment {
@@ -44,7 +44,7 @@ resource "aws_lambda_function" "discord_main" {
   architectures = ["x86_64"]
 
   image_config {
-    command = ["lambda.handler"]
+    command = ["discordLambda.handler"]
   }
 
   environment {
@@ -74,7 +74,7 @@ resource "aws_lambda_function" "google_authorizer" {
   architectures = ["x86_64"]
 
   image_config {
-    command = ["googleLambda.handler"]
+    command = ["googleAuthorizer.handler"]
   }
 
   environment {
@@ -133,7 +133,7 @@ resource "aws_lambda_function" "cron" {
   architectures = ["x86_64"]
 
   image_config {
-    command = ["lambda.handler"]
+    command = ["cron.handler"]
   }
 
   environment {

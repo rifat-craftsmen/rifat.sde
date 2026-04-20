@@ -31,7 +31,7 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 dir('meal-planner-task2/terraform') {
-                    sh 'terraform init'
+                    sh 'terraform init -reconfigure'
                 }
             }
         }
