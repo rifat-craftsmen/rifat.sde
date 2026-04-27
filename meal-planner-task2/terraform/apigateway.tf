@@ -71,6 +71,11 @@ resource "aws_apigatewayv2_stage" "default" {
   name        = "$default"
   auto_deploy = true
 
+  default_route_settings {
+    throttling_rate_limit  = 300  # requests/sec steady state
+    throttling_burst_limit = 300   # max burst
+  }
+
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_gateway.arn
     format          = "{\"requestId\":\"$context.requestId\",\"path\":\"$context.path\",\"status\":\"$context.status\",\"error\":\"$context.error.message\"}\n"
