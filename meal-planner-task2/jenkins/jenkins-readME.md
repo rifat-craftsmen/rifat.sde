@@ -151,5 +151,6 @@ If you do not have a token:
 3. Click the **Build Number** > **Console Output** to monitor progress.
 4. **Manual Gate:** The pipeline will pause at the **Approval** stage. You must manually click **Proceed** in the Jenkins UI before `terraform apply` executes.
 
+<img width="1452" height="522" alt="mhp_v2_deploy" src="https://github.com/user-attachments/assets/a9bfbb66-696c-4eec-844b-29e0d1760b83" />
 
 ---
