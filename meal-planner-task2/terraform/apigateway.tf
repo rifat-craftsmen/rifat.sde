@@ -23,6 +23,17 @@ resource "aws_apigatewayv2_api" "main" {
 #   identity_sources                  = ["$request.header.Authorization"]
 # }
 
+resource "aws_apigatewayv2_authorizer" "discord_request" {
+  api_id                            = aws_apigatewayv2_api.main.id
+  authorizer_type                   = "REQUEST"
+  name                              = "discord-authorizer"
+  authorizer_uri                    = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${aws_lambda_function.discord_authorizer.arn}/invocations"
+  authorizer_payload_format_version = "2.0"
+  authorizer_result_ttl_in_seconds  = 0
+  enable_simple_responses           = true
+  identity_sources                  = ["$request.header.X-Signature-Ed25519", "$request.header.X-Signature-Timestamp"]
+}
+
 resource "aws_apigatewayv2_authorizer" "google_jwt" {
   api_id           = aws_apigatewayv2_api.main.id
   authorizer_type  = "JWT"
@@ -58,9 +69,11 @@ resource "aws_apigatewayv2_integration" "google" {
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 resource "aws_apigatewayv2_route" "discord_interactions" {
-  api_id    = aws_apigatewayv2_api.main.id
-  route_key = "ANY /discord/interactions"
-  target    = "integrations/${aws_apigatewayv2_integration.discord.id}"
+  api_id             = aws_apigatewayv2_api.main.id
+  route_key          = "ANY /discord/interactions"
+  authorization_type = "CUSTOM"
+  authorizer_id      = aws_apigatewayv2_authorizer.discord_request.id
+  target             = "integrations/${aws_apigatewayv2_integration.discord.id}"
 }
 
 resource "aws_apigatewayv2_route" "proxy" {
@@ -113,10 +126,10 @@ resource "aws_lambda_permission" "google_apigw" {
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
 }
 
-resource "aws_lambda_permission" "google_authorizer_apigw" {
-  statement_id  = "AllowAPIGatewayInvokeGoogleAuthorizer"
+resource "aws_lambda_permission" "discord_authorizer_apigw" {
+  statement_id  = "AllowAPIGatewayInvokeDiscordAuthorizer"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.google_authorizer.function_name
+  function_name = aws_lambda_function.discord_authorizer.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
 }

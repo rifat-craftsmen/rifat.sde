@@ -1,33 +1,16 @@
-interface APIGatewayAuthorizerEvent {
-  headers:   Record<string, string>
-  routeArn?: string
-  methodArn?: string
+// HTTP API Gateway v2 REQUEST authorizer (simple responses format).
+// Full Ed25519 signature verification requires the request body, which
+// authorizers don't receive — that stays in discordVerify middleware.
+// This layer only gates on header presence so bodyless requests are
+// rejected before the main Lambda is invoked.
+
+interface DiscordAuthorizerEvent {
+  headers: Record<string, string>
 }
 
-function buildPolicy(effect: 'Allow' | 'Deny', methodArn: string) {
-  return {
-    principalId: 'discord',
-    policyDocument: {
-      Version: '2012-10-17',
-      Statement: [{ Action: 'execute-api:Invoke', Effect: effect, Resource: methodArn }],
-    },
-  }
-}
-
-/**
- * Lambda Authorizer for the Discord interactions route.
- *
- * Only checks that Discord signature headers are present — full Ed25519
- * verification happens in the main Discord Lambda (discordVerify middleware)
- * where the request body is available.
- */
-export const handler = async (event: APIGatewayAuthorizerEvent) => {
+export const handler = async (event: DiscordAuthorizerEvent) => {
   const signature = event.headers['x-signature-ed25519']
   const timestamp = event.headers['x-signature-timestamp']
 
-  if (!signature || !timestamp) {
-    throw new Error('Unauthorized')
-  }
-
-  return buildPolicy('Allow', event.routeArn ?? event.methodArn ?? '*')
+  return { isAuthorized: !!(signature && timestamp) }
 }

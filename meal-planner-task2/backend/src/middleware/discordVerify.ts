@@ -13,14 +13,9 @@ import { verifyKey } from 'discord-interactions'
  *     object so downstream middleware can read it normally.
  */
 export const discordVerify = (req: Request, res: Response, next: NextFunction): void => {
-  const signature = req.headers['x-signature-ed25519'] as string | undefined
-  const timestamp  = req.headers['x-signature-timestamp'] as string | undefined
+  const signature = req.headers['x-signature-ed25519'] as string
+  const timestamp  = req.headers['x-signature-timestamp'] as string
   const publicKey  = process.env.DISCORD_PUBLIC_KEY
-
-  if (!signature || !timestamp) {
-    res.status(401).json({ error: 'Missing signature headers' })
-    return
-  }
 
   if (!publicKey) {
     console.error('DISCORD_PUBLIC_KEY is not set')

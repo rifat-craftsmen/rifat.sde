@@ -1,3 +1,29 @@
+# ─── Build Artifacts ──────────────────────────────────────────────────────────
+
+data "archive_file" "discord_authorizer" {
+  type        = "zip"
+  source_file = "${path.module}/../backend/dist/discordAuthorizer.js"
+  output_path = "${path.module}/../backend/dist/discordAuthorizer.zip"
+}
+
+data "archive_file" "discord_main" {
+  type        = "zip"
+  source_file = "${path.module}/../backend/dist/discordLambda.js"
+  output_path = "${path.module}/../backend/dist/discordLambda.zip"
+}
+
+data "archive_file" "google_main" {
+  type        = "zip"
+  source_file = "${path.module}/../backend/dist/googleLambda.js"
+  output_path = "${path.module}/../backend/dist/googleLambda.zip"
+}
+
+data "archive_file" "cron" {
+  type        = "zip"
+  source_file = "${path.module}/../backend/dist/cron.js"
+  output_path = "${path.module}/../backend/dist/cron.zip"
+}
+
 # ─── Discord Authorizer ───────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_log_group" "discord_authorizer" {
@@ -6,17 +32,15 @@ resource "aws_cloudwatch_log_group" "discord_authorizer" {
 }
 
 resource "aws_lambda_function" "discord_authorizer" {
-  function_name = "trainee-2026-rifat-discord-authorizer-v2"
-  role          = aws_iam_role.lambda_role.arn
-  package_type  = "Image"
-  image_uri     = var.image_uri
-  timeout       = 10
-  memory_size   = 128
-  architectures = ["x86_64"]
-
-  image_config {
-    command = ["discordAuthorizer.handler"]
-  }
+  function_name    = "trainee-2026-rifat-discord-authorizer-v2"
+  role             = aws_iam_role.lambda_role.arn
+  runtime          = "nodejs22.x"
+  handler          = "discordAuthorizer.handler"
+  filename         = data.archive_file.discord_authorizer.output_path
+  source_code_hash = data.archive_file.discord_authorizer.output_base64sha256
+  timeout          = 10
+  memory_size      = 128
+  architectures    = ["x86_64"]
 
   environment {
     variables = {
@@ -35,17 +59,15 @@ resource "aws_cloudwatch_log_group" "discord_lambda" {
 }
 
 resource "aws_lambda_function" "discord_main" {
-  function_name = "trainee-2026-rifat-discord-lambda-v2"
-  role          = aws_iam_role.lambda_role.arn
-  package_type  = "Image"
-  image_uri     = var.image_uri
-  timeout       = 30
-  memory_size   = 512
-  architectures = ["x86_64"]
-
-  image_config {
-    command = ["discordLambda.handler"]
-  }
+  function_name    = "trainee-2026-rifat-discord-lambda-v2"
+  role             = aws_iam_role.lambda_role.arn
+  runtime          = "nodejs22.x"
+  handler          = "discordLambda.handler"
+  filename         = data.archive_file.discord_main.output_path
+  source_code_hash = data.archive_file.discord_main.output_base64sha256
+  timeout          = 30
+  memory_size      = 512
+  architectures    = ["x86_64"]
 
   environment {
     variables = {
@@ -57,35 +79,6 @@ resource "aws_lambda_function" "discord_main" {
   depends_on = [aws_cloudwatch_log_group.discord_lambda]
 }
 
-# ─── Google Authorizer ────────────────────────────────────────────────────────
-
-resource "aws_cloudwatch_log_group" "google_authorizer" {
-  name              = "/aws/lambda/trainee-2026-rifat-google-authorizer-v2"
-  retention_in_days = 14
-}
-
-resource "aws_lambda_function" "google_authorizer" {
-  function_name = "trainee-2026-rifat-google-authorizer-v2"
-  role          = aws_iam_role.lambda_role.arn
-  package_type  = "Image"
-  image_uri     = var.image_uri
-  timeout       = 10
-  memory_size   = 256
-  architectures = ["x86_64"]
-
-  image_config {
-    command = ["googleAuthorizer.handler"]
-  }
-
-  environment {
-    variables = {
-      GOOGLE_CHAT_APP_ID = var.google_chat_app_id
-    }
-  }
-
-  depends_on = [aws_cloudwatch_log_group.google_authorizer]
-}
-
 # ─── Google Main ──────────────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_log_group" "google_lambda" {
@@ -94,17 +87,15 @@ resource "aws_cloudwatch_log_group" "google_lambda" {
 }
 
 resource "aws_lambda_function" "google_main" {
-  function_name = "trainee-2026-rifat-google-lambda-v2"
-  role          = aws_iam_role.lambda_role.arn
-  package_type  = "Image"
-  image_uri     = var.image_uri
-  timeout       = 30
-  memory_size   = 256
-  architectures = ["x86_64"]
-
-  image_config {
-    command = ["googleLambda.handler"]
-  }
+  function_name    = "trainee-2026-rifat-google-lambda-v2"
+  role             = aws_iam_role.lambda_role.arn
+  runtime          = "nodejs22.x"
+  handler          = "googleLambda.handler"
+  filename         = data.archive_file.google_main.output_path
+  source_code_hash = data.archive_file.google_main.output_base64sha256
+  timeout          = 30
+  memory_size      = 256
+  architectures    = ["x86_64"]
 
   environment {
     variables = {
@@ -124,17 +115,15 @@ resource "aws_cloudwatch_log_group" "cron_lambda" {
 }
 
 resource "aws_lambda_function" "cron" {
-  function_name = "trainee-2026-rifat-cron-lambda-v2"
-  role          = aws_iam_role.lambda_role.arn
-  package_type  = "Image"
-  image_uri     = var.image_uri
-  timeout       = 30
-  memory_size   = 256
-  architectures = ["x86_64"]
-
-  image_config {
-    command = ["cron.handler"]
-  }
+  function_name    = "trainee-2026-rifat-cron-lambda-v2"
+  role             = aws_iam_role.lambda_role.arn
+  runtime          = "nodejs22.x"
+  handler          = "cron.handler"
+  filename         = data.archive_file.cron.output_path
+  source_code_hash = data.archive_file.cron.output_base64sha256
+  timeout          = 30
+  memory_size      = 256
+  architectures    = ["x86_64"]
 
   environment {
     variables = {
