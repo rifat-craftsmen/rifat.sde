@@ -1,12 +1,11 @@
 import 'dotenv/config'
-import { QueryCommand, BatchGetCommand, BatchWriteCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { QueryCommand, BatchGetCommand, BatchWriteCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamo, TABLES } from '../config/dynamoClient.js'
 import {
   getTodayString,
   getTomorrowString,
   isWeekend,
   isDateInPeriod,
-  getCurrentMonthKey,
 } from '../utils/dateHelpers.js'
 import { writeAuditLog } from '../services/auditService.js'
 import { getHeadcount, formatHeadcountMessage } from '../services/headcountService.js'
@@ -155,45 +154,48 @@ async function createRecords(): Promise<void> {
   //    - Global WFH day: override all meals → false, workFromHome → true
   //    - Normal day: fill only null meal fields with schedule defaults
   let filledCount = 0
+  const updatedItems: MealRecordItem[] = []
+
   for (const discordId of hasRecord) {
     const record = existingByUser.get(discordId)!
 
     if (isGlobalWFH) {
-      await dynamo.send(new UpdateCommand({
-        TableName:                 TABLES.MAIN,
-        Key:                       { PK: `USER#${discordId}`, SK: `RECORD#${date}` },
-        UpdateExpression:          'SET lunch = :f, snacks = :f, iftar = :f, eventDinner = :f, optionalDinner = :f, workFromHome = :t, updatedAt = :now',
-        ExpressionAttributeValues: { ':f': false, ':t': true, ':now': now },
-      }))
+      updatedItems.push({
+        ...record,
+        lunch: false, snacks: false, iftar: false, eventDinner: false, optionalDinner: false,
+        workFromHome: true, updatedAt: now,
+      })
       filledCount++
     } else {
-      const updates: string[] = []
-      const values: Record<string, unknown> = { ':now': now }
+      const hasNull =
+        (record.lunch          === null && defaults.lunch          !== null) ||
+        (record.snacks         === null && defaults.snacks         !== null) ||
+        (record.iftar          === null && defaults.iftar          !== null) ||
+        (record.eventDinner    === null && defaults.eventDinner    !== null) ||
+        (record.optionalDinner === null && defaults.optionalDinner !== null)
 
-      const mealFields = [
-        { field: 'lunch',          key: ':lunch',   val: defaults.lunch },
-        { field: 'snacks',         key: ':snacks',  val: defaults.snacks },
-        { field: 'iftar',          key: ':iftar',   val: defaults.iftar },
-        { field: 'eventDinner',    key: ':ed',      val: defaults.eventDinner },
-        { field: 'optionalDinner', key: ':od',      val: defaults.optionalDinner },
-      ] as const
-
-      for (const { field, key, val } of mealFields) {
-        if (record[field] === null && val !== null) {
-          updates.push(`${field} = ${key}`)
-          values[key] = val
-        }
-      }
-
-      if (updates.length) {
-        await dynamo.send(new UpdateCommand({
-          TableName:                 TABLES.MAIN,
-          Key:                       { PK: `USER#${discordId}`, SK: `RECORD#${date}` },
-          UpdateExpression:          `SET ${updates.join(', ')}, updatedAt = :now`,
-          ExpressionAttributeValues: values,
-        }))
+      if (hasNull) {
+        updatedItems.push({
+          ...record,
+          lunch:          record.lunch          === null ? defaults.lunch          : record.lunch,
+          snacks:         record.snacks         === null ? defaults.snacks         : record.snacks,
+          iftar:          record.iftar          === null ? defaults.iftar          : record.iftar,
+          eventDinner:    record.eventDinner    === null ? defaults.eventDinner    : record.eventDinner,
+          optionalDinner: record.optionalDinner === null ? defaults.optionalDinner : record.optionalDinner,
+          updatedAt: now,
+        })
         filledCount++
       }
+    }
+  }
+
+  if (updatedItems.length) {
+    for (const chunk of chunkArray(updatedItems, 25)) {
+      await dynamo.send(new BatchWriteCommand({
+        RequestItems: {
+          [TABLES.MAIN]: chunk.map(item => ({ PutRequest: { Item: item } })),
+        },
+      }))
     }
   }
 

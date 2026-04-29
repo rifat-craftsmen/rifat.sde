@@ -17,19 +17,19 @@ export async function createOrUpdateMealRecord(
 ): Promise<void> {
   const now = new Date().toISOString()
 
-  // 1. Fetch user profile (required for denormalization + WFH counter)
-  const profileResult = await dynamo.send(new GetCommand({
-    TableName: TABLES.MAIN,
-    Key: { PK: `USER#${discordId}`, SK: 'PROFILE' },
-  }))
+  // 1 & 2. Fetch user profile and existing meal record in parallel
+  const [profileResult, existingResult] = await Promise.all([
+    dynamo.send(new GetCommand({
+      TableName: TABLES.MAIN,
+      Key: { PK: `USER#${discordId}`, SK: 'PROFILE' },
+    })),
+    dynamo.send(new GetCommand({
+      TableName: TABLES.MAIN,
+      Key: { PK: `USER#${discordId}`, SK: `RECORD#${data.date}` },
+    })),
+  ])
   if (!profileResult.Item) throw new Error('User profile not found')
-  const user = profileResult.Item as UserItem
-
-  // 2. Fetch existing meal record (to carry forward unset fields + compute WFH delta)
-  const existingResult = await dynamo.send(new GetCommand({
-    TableName: TABLES.MAIN,
-    Key: { PK: `USER#${discordId}`, SK: `RECORD#${data.date}` },
-  }))
+  const user     = profileResult.Item as UserItem
   const existing = existingResult.Item as MealRecordItem | undefined
 
   // 3. Resolve WFH — carry forward if not provided
@@ -129,36 +129,36 @@ export async function getMySchedule(discordId: string): Promise<ScheduleDay[]> {
   const dates   = getNextNWeekdays(MEAL_WINDOW_WEEKDAYS)
   const endDate = dates[dates.length - 1]
 
-  // 1. Query user's meal records for the weekday range
-  const recordsResult = await dynamo.send(new QueryCommand({
-    TableName: TABLES.MAIN,
-    KeyConditionExpression: 'PK = :pk AND SK BETWEEN :start AND :end',
-    ExpressionAttributeValues: {
-      ':pk':    `USER#${discordId}`,
-      ':start': `RECORD#${today}`,
-      ':end':   `RECORD#${endDate}`,
-    },
-  }))
-  const records = (recordsResult.Items ?? []) as MealRecordItem[]
+  // 1-3. Fetch meal records, published schedules, and WFH periods in parallel
+  const [recordsResult, schedulesResult, wfhResult] = await Promise.all([
+    dynamo.send(new QueryCommand({
+      TableName: TABLES.MAIN,
+      KeyConditionExpression: 'PK = :pk AND SK BETWEEN :start AND :end',
+      ExpressionAttributeValues: {
+        ':pk':    `USER#${discordId}`,
+        ':start': `RECORD#${today}`,
+        ':end':   `RECORD#${endDate}`,
+      },
+    })),
+    dynamo.send(new BatchGetCommand({
+      RequestItems: {
+        [TABLES.MAIN]: {
+          Keys: dates.map(d => ({ PK: 'SCHEDULE', SK: d })),
+        },
+      },
+    })),
+    dynamo.send(new QueryCommand({
+      TableName: TABLES.MAIN,
+      KeyConditionExpression: 'PK = :pk',
+      ExpressionAttributeValues: { ':pk': 'WFHPERIOD' },
+    })),
+  ])
+  const records       = (recordsResult.Items ?? []) as MealRecordItem[]
   const recordsByDate = Object.fromEntries(records.map(r => [r.date, r]))
 
-  // 2. BatchGet published schedules for all weekday dates
-  const schedulesResult = await dynamo.send(new BatchGetCommand({
-    RequestItems: {
-      [TABLES.MAIN]: {
-        Keys: dates.map(d => ({ PK: 'SCHEDULE', SK: d })),
-      },
-    },
-  }))
-  const scheduleItems = (schedulesResult.Responses?.[TABLES.MAIN] ?? []) as MealScheduleItem[]
+  const scheduleItems   = (schedulesResult.Responses?.[TABLES.MAIN] ?? []) as MealScheduleItem[]
   const schedulesByDate = Object.fromEntries(scheduleItems.map(s => [s.date, s]))
 
-  // 3. Fetch all WFH periods to check overlap per date
-  const wfhResult = await dynamo.send(new QueryCommand({
-    TableName: TABLES.MAIN,
-    KeyConditionExpression: 'PK = :pk',
-    ExpressionAttributeValues: { ':pk': 'WFHPERIOD' },
-  }))
   const wfhPeriods = (wfhResult.Items ?? []) as WfhPeriodItem[]
 
   // 4. Build one entry per weekday

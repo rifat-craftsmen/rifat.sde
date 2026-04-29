@@ -159,7 +159,7 @@ resource "aws_scheduler_schedule" "create_meal_records" {
 
   schedule_expression          = "cron(0 21 ? * SUN-THU *)"
   schedule_expression_timezone = "Asia/Dhaka"
-  state                        = "DISABLED"
+  state                        = "ENABLED"
 
   target {
     arn      = aws_lambda_function.cron.arn
@@ -183,7 +183,7 @@ resource "aws_scheduler_schedule" "send_report" {
 
   schedule_expression          = "cron(0 9 ? * MON-FRI *)"
   schedule_expression_timezone = "Asia/Dhaka"
-  state                        = "DISABLED"
+  state                        = "ENABLED"
 
   target {
     arn      = aws_lambda_function.cron.arn

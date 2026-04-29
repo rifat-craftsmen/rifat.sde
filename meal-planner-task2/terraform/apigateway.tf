@@ -11,15 +11,28 @@ resource "aws_apigatewayv2_api" "main" {
 
 # ─── Authorizers ──────────────────────────────────────────────────────────────
 
-resource "aws_apigatewayv2_authorizer" "google" {
-  api_id                            = aws_apigatewayv2_api.main.id
-  authorizer_type                   = "REQUEST"
-  name                              = "google-authorizer-v2"
-  authorizer_uri                    = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${aws_lambda_function.google_authorizer.arn}/invocations"
-  authorizer_payload_format_version = "2.0"
-  authorizer_result_ttl_in_seconds  = 0
-  enable_simple_responses           = false
-  identity_sources                  = ["$request.header.Authorization"]
+# Old Lambda authorizer — kept for reference, no longer used
+# resource "aws_apigatewayv2_authorizer" "google" {
+#   api_id                            = aws_apigatewayv2_api.main.id
+#   authorizer_type                   = "REQUEST"
+#   name                              = "google-authorizer-v2"
+#   authorizer_uri                    = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${aws_lambda_function.google_authorizer.arn}/invocations"
+#   authorizer_payload_format_version = "2.0"
+#   authorizer_result_ttl_in_seconds  = 300
+#   enable_simple_responses           = false
+#   identity_sources                  = ["$request.header.Authorization"]
+# }
+
+resource "aws_apigatewayv2_authorizer" "google_jwt" {
+  api_id           = aws_apigatewayv2_api.main.id
+  authorizer_type  = "JWT"
+  name             = "google-jwt-authorizer"
+  identity_sources = ["$request.header.Authorization"]
+
+  jwt_configuration {
+    audience = [var.google_chat_app_id]
+    issuer   = "https://accounts.google.com"
+  }
 }
 
 # ─── Integrations ─────────────────────────────────────────────────────────────
@@ -59,8 +72,8 @@ resource "aws_apigatewayv2_route" "proxy" {
 resource "aws_apigatewayv2_route" "google_interactions" {
   api_id             = aws_apigatewayv2_api.main.id
   route_key          = "ANY /google/interactions"
-  authorization_type = "CUSTOM"
-  authorizer_id      = aws_apigatewayv2_authorizer.google.id
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.google_jwt.id
   target             = "integrations/${aws_apigatewayv2_integration.google.id}"
 }
 

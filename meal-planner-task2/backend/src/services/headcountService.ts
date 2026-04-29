@@ -20,24 +20,29 @@ export async function getHeadcount(date: string): Promise<HeadcountData> {
   const activeUsers = (gsiResult.Items ?? []) as UserItem[]
   const discordIds  = activeUsers.map(u => u.discordId)
 
-  // 2. BatchGet meal records for the date (chunks of 100)
-  const records: MealRecordItem[] = []
-  for (const chunk of chunkArray(discordIds, 100)) {
-    const batch = await dynamo.send(new BatchGetCommand({
-      RequestItems: {
-        [TABLES.MAIN]: {
-          Keys: chunk.map(id => ({ PK: `USER#${id}`, SK: `RECORD#${date}` })),
+  // 2 & 3. BatchGet meal records and fetch schedule in parallel
+  const fetchRecords = async (): Promise<MealRecordItem[]> => {
+    const records: MealRecordItem[] = []
+    for (const chunk of chunkArray(discordIds, 100)) {
+      const batch = await dynamo.send(new BatchGetCommand({
+        RequestItems: {
+          [TABLES.MAIN]: {
+            Keys: chunk.map(id => ({ PK: `USER#${id}`, SK: `RECORD#${date}` })),
+          },
         },
-      },
-    }))
-    records.push(...((batch.Responses?.[TABLES.MAIN] ?? []) as MealRecordItem[]))
+      }))
+      records.push(...((batch.Responses?.[TABLES.MAIN] ?? []) as MealRecordItem[]))
+    }
+    return records
   }
 
-  // 3. Fetch schedule for occasionName
-  const scheduleResult = await dynamo.send(new GetCommand({
-    TableName: TABLES.MAIN,
-    Key: { PK: 'SCHEDULE', SK: date },
-  }))
+  const [records, scheduleResult] = await Promise.all([
+    fetchRecords(),
+    dynamo.send(new GetCommand({
+      TableName: TABLES.MAIN,
+      Key: { PK: 'SCHEDULE', SK: date },
+    })),
+  ])
   const schedule = scheduleResult.Item as MealScheduleItem | undefined
 
   // 4. Aggregate meal totals
