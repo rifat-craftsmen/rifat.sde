@@ -1,5 +1,7 @@
 node_modules/
 dist/
+backend/layer/nodejs/node_modules/
+backend/artifacts/
 .env
 scripts/.test-keypair.json
 data/shared-local-instance.db

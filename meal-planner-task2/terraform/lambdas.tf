@@ -24,6 +24,22 @@ data "archive_file" "cron" {
   output_path = "${path.module}/../backend/dist/cron.zip"
 }
 
+data "archive_file" "layer" {
+  type        = "zip"
+  source_dir  = "${path.module}/../backend/layer"
+  output_path = "${path.module}/../backend/artifacts/layer.zip"
+}
+
+# ─── Lambda Layer ─────────────────────────────────────────────────────────────
+
+resource "aws_lambda_layer_version" "deps" {
+  filename                 = data.archive_file.layer.output_path
+  layer_name               = "trainee-2026-rifat-deps"
+  compatible_runtimes      = ["nodejs22.x"]
+  compatible_architectures = ["x86_64"]
+  source_code_hash         = data.archive_file.layer.output_base64sha256
+}
+
 # ─── Discord Authorizer ───────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_log_group" "discord_authorizer" {
@@ -38,6 +54,7 @@ resource "aws_lambda_function" "discord_authorizer" {
   handler          = "discordAuthorizer.handler"
   filename         = data.archive_file.discord_authorizer.output_path
   source_code_hash = data.archive_file.discord_authorizer.output_base64sha256
+  layers           = [aws_lambda_layer_version.deps.arn]
   timeout          = 10
   memory_size      = 128
   architectures    = ["x86_64"]
@@ -65,6 +82,7 @@ resource "aws_lambda_function" "discord_main" {
   handler          = "discordLambda.handler"
   filename         = data.archive_file.discord_main.output_path
   source_code_hash = data.archive_file.discord_main.output_base64sha256
+  layers           = [aws_lambda_layer_version.deps.arn]
   timeout          = 30
   memory_size      = 512
   architectures    = ["x86_64"]
@@ -93,6 +111,7 @@ resource "aws_lambda_function" "google_main" {
   handler          = "googleLambda.handler"
   filename         = data.archive_file.google_main.output_path
   source_code_hash = data.archive_file.google_main.output_base64sha256
+  layers           = [aws_lambda_layer_version.deps.arn]
   timeout          = 30
   memory_size      = 256
   architectures    = ["x86_64"]
@@ -121,6 +140,7 @@ resource "aws_lambda_function" "cron" {
   handler          = "cron.handler"
   filename         = data.archive_file.cron.output_path
   source_code_hash = data.archive_file.cron.output_base64sha256
+  layers           = [aws_lambda_layer_version.deps.arn]
   timeout          = 30
   memory_size      = 256
   architectures    = ["x86_64"]

@@ -3,12 +3,17 @@ LAMBDA_GOOGLE       = trainee-2026-rifat-google-lambda-v2
 LAMBDA_CRON         = trainee-2026-rifat-cron-lambda-v2
 LAMBDA_DISCORD_AUTH = trainee-2026-rifat-discord-authorizer-v2
 
-.PHONY: build deploy
+.PHONY: build build-layer deploy
 
 build:
 	npm run build
 
+# Run once when deps change; Layer updates go through Terraform thereafter
+build-layer:
+	cd layer/nodejs && npm install --omit=dev
+
 # Quick local deploy: build then upload zips directly (bypasses Terraform / Jenkins)
+# Assumes the Layer already exists (created via Terraform on first deploy)
 deploy: build
 	zip -j dist/discordLambda.zip      dist/discordLambda.js
 	zip -j dist/discordAuthorizer.zip  dist/discordAuthorizer.js
