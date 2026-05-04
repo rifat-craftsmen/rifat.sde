@@ -7,6 +7,8 @@ Three steps:
 2. **Experience** — one or more previous jobs (`useFieldArray`).
 3. **Review & submit** — read-only summary plus a confirmation checkbox.
 
+Vercel: https://form-validation-5q0nlth20-rifat-craftsmens-projects.vercel.app/
+
 ## Tech used
 
 - **React 18** + **TypeScript** (strict)

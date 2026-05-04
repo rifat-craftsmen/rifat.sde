@@ -6,3 +6,4 @@ dist
 .env
 docs/
 setup-commits.sh
+.vercel
