@@ -9,13 +9,12 @@ function DemoApp() {
   const [password, setPassword] = useState('password123');
   const [loginError, setLoginError] = useState('');
 
-  const handleLogin = () => {
-    const success = login(email, password);
-    if (!success) {
-      setLoginError('Please enter email and password');
+  const handleLogin = async () => {
+    const { ok, error } = await login(email, password);
+    if (!ok) {
+      setLoginError(error ?? 'Login failed');
     } else {
       setLoginError('');
-      // Programmatic navigation after login — same as useNavigate('/dashboard')
       navigate('/demo');
     }
   };
@@ -26,8 +25,8 @@ function DemoApp() {
       <div style={styles.card}>
         {!isLoggedIn ? (
           <div style={styles.loginBox}>
-            <h3>Login (Mock Auth)</h3>
-            <p>Enter any email/password to simulate login</p>
+            <h3>Login</h3>
+            <p>Credentials are validated against the backend (demo@example.com / password123)</p>
             <input
               type="email"
               placeholder="Email"
@@ -51,7 +50,7 @@ function DemoApp() {
           <div>
             <div style={styles.loggedBox}>
               <h3>✅ You are logged in!</h3>
-              <p><strong>Mock token:</strong> {token}</p>
+              <p><strong>JWT:</strong> <span style={{ wordBreak: 'break-all', fontSize: '0.8rem' }}>{token}</span></p>
               <button onClick={logout} style={styles.button}>Logout</button>
             </div>
 
