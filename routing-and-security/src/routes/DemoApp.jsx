@@ -1,10 +1,13 @@
 import { useAuth } from '../context/AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 
 function DemoApp() {
   const { isLoggedIn, token, login, logout } = useAuth();
-  const navigate = useNavigate(); // useNavigate for programmatic navigation
+  const navigate = useNavigate();
+  const location = useLocation();
+  // ProtectedRoute sets state.from to the URL the user originally tried to visit
+  const intendedPath = location.state?.from ?? null;
   const [email, setEmail] = useState('demo@example.com');
   const [password, setPassword] = useState('password123');
   const [loginError, setLoginError] = useState('');
@@ -15,7 +18,8 @@ function DemoApp() {
       setLoginError(error ?? 'Login failed');
     } else {
       setLoginError('');
-      navigate('/demo');
+      // Navigate back to the page the user was trying to reach, or stay on /demo
+      navigate(intendedPath ?? '/demo', { replace: true });
     }
   };
 
@@ -27,6 +31,11 @@ function DemoApp() {
           <div style={styles.loginBox}>
             <h3>Login</h3>
             <p>Credentials are validated against the backend (demo@example.com / password123)</p>
+            {intendedPath && (
+              <p style={{ background: '#fff3cd', padding: '0.4rem 0.6rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                You will be redirected to <code>{intendedPath}</code> after login.
+              </p>
+            )}
             <input
               type="email"
               placeholder="Email"
