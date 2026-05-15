@@ -9,10 +9,8 @@ function XSSDemo() {
   );
   const [securityLog, setSecurityLog] = useState([]);
 
-  const [cookieSessionEnabled, setCookieSessionEnabled] = useState(true);
-  const [sameSiteMode, setSameSiteMode] = useState('none');
   const [csrfTokenOnForm, setCsrfTokenOnForm] = useState(false);
-  const [csrfTokenOnServer, setCsrfTokenOnServer] = useState('secure-123');
+  const [fetchedCsrfToken, setFetchedCsrfToken] = useState(null);
   const [requestResult, setRequestResult] = useState('No request yet');
 
   const appendLog = (line) => {
@@ -24,41 +22,45 @@ function XSSDemo() {
     setSafeInput(payload);
   };
 
-  const csrfProtectedTransfer = ({ crossSite, providedToken }) => {
-    const browserSendsCookie = cookieSessionEnabled && (sameSiteMode === 'none' || !crossSite);
-    const csrfTokenValid = providedToken && providedToken === csrfTokenOnServer;
-
-    if (!browserSendsCookie) {
-      return {
-        ok: false,
-        reason: 'Blocked: session cookie not sent (SameSite + cross-site request).',
-      };
+  const fetchCsrfToken = async () => {
+    try {
+      const res = await fetch('/api/csrf-token');
+      const { csrfToken } = await res.json();
+      setFetchedCsrfToken(csrfToken);
+      appendLog(`[server] GET /api/csrf-token -> issued ${csrfToken.slice(0, 8)}…`);
+    } catch {
+      appendLog('[server] GET /api/csrf-token -> network error');
     }
-
-    if (!csrfTokenValid) {
-      return {
-        ok: false,
-        reason: 'Blocked: missing or invalid CSRF token.',
-      };
-    }
-
-    return {
-      ok: true,
-      reason: 'Success: transfer accepted (cookie + valid CSRF token).',
-    };
   };
 
-  const runAttackSimulation = () => {
-    const result = csrfProtectedTransfer({ crossSite: true, providedToken: null });
-    setRequestResult(result.reason);
-    appendLog(`[attack] POST /transfer cross-site -> ${result.reason}`);
+  // Always sends without a token — backend will reject with 403
+  const runAttackSimulation = async () => {
+    try {
+      const res = await fetch('/api/transfer', { method: 'POST' });
+      const data = await res.json();
+      setRequestResult(data.reason);
+      appendLog(`[attack] POST /api/transfer (no token) -> ${data.reason}`);
+    } catch {
+      appendLog('[attack] POST /api/transfer -> network error');
+    }
   };
 
-  const runLegitTransfer = () => {
-    const providedToken = csrfTokenOnForm ? csrfTokenOnServer : null;
-    const result = csrfProtectedTransfer({ crossSite: false, providedToken });
-    setRequestResult(result.reason);
-    appendLog(`[user] POST /transfer same-site -> ${result.reason}`);
+  // Sends with or without the token depending on the checkbox
+  const runLegitTransfer = async () => {
+    const headers = {};
+    if (csrfTokenOnForm && fetchedCsrfToken) {
+      headers['x-csrf-token'] = fetchedCsrfToken;
+    }
+    try {
+      const res = await fetch('/api/transfer', { method: 'POST', headers });
+      const data = await res.json();
+      setRequestResult(data.reason);
+      appendLog(`[user] POST /api/transfer ${csrfTokenOnForm ? '(token sent)' : '(no token)'} -> ${data.reason}`);
+      // Token is single-use; clear it so the next run requires a fresh fetch
+      if (data.ok) setFetchedCsrfToken(null);
+    } catch {
+      appendLog('[user] POST /api/transfer -> network error');
+    }
   };
 
   return (
@@ -137,58 +139,47 @@ function XSSDemo() {
 
         <div style={styles.twoCol}>
           <div style={styles.csrfVuln}>
-            <h3 style={styles.subHeading}>Environment toggles</h3>
-            <label style={styles.checkboxLine}>
-              <input
-                type="checkbox"
-                checked={cookieSessionEnabled}
-                onChange={(e) => setCookieSessionEnabled(e.target.checked)}
-              />
-              Browser has session cookie
-            </label>
-            <label style={styles.label}>SameSite mode</label>
-            <select
-              value={sameSiteMode}
-              onChange={(e) => setSameSiteMode(e.target.value)}
-              style={styles.select}
-            >
-              <option value="none">None (least safe)</option>
-              <option value="lax">Lax</option>
-              <option value="strict">Strict</option>
-            </select>
+            <h3 style={styles.subHeading}>Step 1 — get a real token from the server</h3>
+            <p style={styles.small}>
+              The backend issues a UUID, stores it server-side, and returns it here.
+              Each token is single-use and consumed on the first valid request.
+            </p>
+            <button onClick={fetchCsrfToken} style={styles.fetchButton}>
+              Fetch CSRF token from server
+            </button>
+            <div style={styles.tokenDisplay}>
+              <strong>Token held by this page:</strong><br />
+              {fetchedCsrfToken
+                ? <code style={{ wordBreak: 'break-all', fontSize: '0.82rem' }}>{fetchedCsrfToken}</code>
+                : <em style={{ color: '#64748b' }}>none — click Fetch first</em>}
+            </div>
 
-            <label style={styles.checkboxLine}>
+            <label style={{ ...styles.checkboxLine, marginTop: '1rem' }}>
               <input
                 type="checkbox"
                 checked={csrfTokenOnForm}
                 onChange={(e) => setCsrfTokenOnForm(e.target.checked)}
               />
-              Legit form includes CSRF token
+              &nbsp;Legit form sends token in <code>x-csrf-token</code> header
             </label>
-
-            <label style={styles.label}>Server expected CSRF token</label>
-            <input
-              value={csrfTokenOnServer}
-              onChange={(e) => setCsrfTokenOnServer(e.target.value)}
-              style={styles.input}
-            />
           </div>
 
           <div style={styles.csrfFixed}>
-            <h3 style={styles.subHeading}>Request simulations</h3>
+            <h3 style={styles.subHeading}>Step 2 — run a request</h3>
             <button onClick={runAttackSimulation} style={styles.dangerButton}>
-              Simulate malicious cross-site request
+              Simulate malicious request (no token)
             </button>
-            <button onClick={runLegitTransfer} style={styles.safeButton}>
-              Simulate legitimate user transfer
+            <button onClick={runLegitTransfer} style={{ ...styles.safeButton, marginLeft: 0, marginTop: '0.5rem', display: 'block' }}>
+              Simulate legitimate transfer
             </button>
 
             <div style={styles.resultBox}>
-              <strong>Latest result:</strong> {requestResult}
+              <strong>Backend response:</strong> {requestResult}
             </div>
 
             <p style={styles.small}>
-              Cross-site attack sends no trusted CSRF token. If server requires token, request is blocked.
+              The attack always omits the token → backend returns 403.<br />
+              The legit transfer passes or fails based on the checkbox above.
             </p>
           </div>
         </div>
@@ -318,10 +309,22 @@ const styles = {
     fontWeight: 600,
     fontSize: '0.9rem',
   },
-  select: {
-    width: '100%',
-    padding: '0.45rem',
-    marginBottom: '0.6rem',
+  fetchButton: {
+    background: '#6366f1',
+    color: 'white',
+    border: 'none',
+    padding: '0.45rem 0.9rem',
+    cursor: 'pointer',
+    borderRadius: '4px',
+  },
+  tokenDisplay: {
+    marginTop: '0.6rem',
+    background: '#f1f5f9',
+    border: '1px solid #cbd5e1',
+    borderRadius: '4px',
+    padding: '0.5rem 0.7rem',
+    fontSize: '0.85rem',
+    lineHeight: '1.5',
   },
   dangerButton: {
     background: '#e74c3c',
@@ -330,6 +333,8 @@ const styles = {
     padding: '0.5rem 1rem',
     cursor: 'pointer',
     borderRadius: '4px',
+    display: 'block',
+    width: '100%',
   },
   safeButton: {
     background: '#2ecc71',
@@ -338,7 +343,6 @@ const styles = {
     padding: '0.5rem 1rem',
     cursor: 'pointer',
     borderRadius: '4px',
-    marginLeft: '0.5rem',
   },
   resultBox: {
     marginTop: '1rem',
