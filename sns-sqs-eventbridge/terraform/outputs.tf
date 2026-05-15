@@ -48,6 +48,31 @@ output "eventbridge_pipe_name" {
   value       = aws_pipes_pipe.sqs_to_stepfunctions.name
 }
 
+output "aws_region" {
+  description = "AWS region resources are deployed in"
+  value       = var.aws_region
+}
+
+output "cloudfront_url" {
+  description = "CloudFront distribution domain — use this as the app URL"
+  value       = aws_cloudfront_distribution.main.domain_name
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID — used for cache invalidation during deploy"
+  value       = aws_cloudfront_distribution.main.id
+}
+
+output "s3_frontend_bucket" {
+  description = "S3 bucket name for React SPA assets"
+  value       = aws_s3_bucket.frontend.bucket
+}
+
+output "api_gateway_url" {
+  description = "Direct API Gateway URL (informational — use CloudFront URL in production)"
+  value       = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_api_gateway_stage.main.stage_name}"
+}
+
 output "cost_estimation_note" {
   description = "Cost estimation for deployed resources"
   value = <<-EOT
