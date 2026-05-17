@@ -3,35 +3,54 @@ import "./App.css";
 
 const STATUS = { idle: "idle", sending: "sending", ok: "ok", err: "err" };
 
+const DEFAULT_BODY = JSON.stringify({ id: 1, content: "hello world" }, null, 2);
+
+const SCENARIOS = [
+  {
+    type: "good",
+    label: "good",
+    hint: "Stored in DynamoDB",
+    color: "green",
+  },
+  {
+    type: "bad",
+    label: "bad",
+    hint: "Email alert via SNS",
+    color: "red",
+  },
+  {
+    type: "custom",
+    label: "other",
+    hint: "Invalid/unknown type → email alert via SNS",
+    color: "yellow",
+  },
+];
+
 export default function App() {
-  const [form, setForm] = useState({ id: "", content: "", type: "good" });
+  const [body, setBody] = useState(DEFAULT_BODY);
+  const [typeChoice, setTypeChoice] = useState("good");
+  const [customType, setCustomType] = useState("invalid");
   const [status, setStatus] = useState(STATUS.idle);
   const [detail, setDetail] = useState("");
 
-  function onChange(e) {
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
-  }
+  const effectiveType = typeChoice === "custom" ? customType : typeChoice;
 
   async function onSubmit(e) {
     e.preventDefault();
-    const id = parseInt(form.id, 10);
-    if (!id || !form.content.trim()) return;
-
     setStatus(STATUS.sending);
     setDetail("");
 
     try {
-      const res = await fetch("/api/messages", {
+      const res = await fetch(`/api/messages?type=${encodeURIComponent(effectiveType)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, content: form.content.trim(), type: form.type }),
+        body: body,
       });
 
       const text = await res.text();
       if (res.ok) {
         setStatus(STATUS.ok);
-        setDetail(`Message queued (HTTP ${res.status})`);
-        setForm({ id: "", content: "", type: "good" });
+        setDetail(`Queued with type="${effectiveType}" (HTTP ${res.status})`);
       } else {
         setStatus(STATUS.err);
         setDetail(`HTTP ${res.status}: ${text}`);
@@ -54,73 +73,93 @@ export default function App() {
       <div className="card">
         <h1>Message Queue</h1>
         <p className="subtitle">
-          Send a message through CloudFront → API Gateway → SQS
+          CloudFront → API Gateway → SQS → Step Function
         </p>
 
         <form onSubmit={onSubmit}>
-          <label>
-            ID
-            <input
-              name="id"
-              type="number"
-              min="1"
-              value={form.id}
-              onChange={onChange}
-              placeholder="e.g. 42"
-              required
-            />
-          </label>
+          {/* ── Type (SQS message attribute) ── */}
+          <div className="field">
+            <label className="field-label">
+              Message type
+              <span className="field-note">SQS message attribute</span>
+            </label>
+            <div className="type-grid">
+              {SCENARIOS.map((s) => (
+                <label
+                  key={s.type}
+                  className={`type-card ${s.color} ${typeChoice === s.type ? "selected" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="typeChoice"
+                    value={s.type}
+                    checked={typeChoice === s.type}
+                    onChange={(e) => setTypeChoice(e.target.value)}
+                  />
+                  <span className="type-name">{s.label}</span>
+                  <span className="type-hint">{s.hint}</span>
+                </label>
+              ))}
+            </div>
 
-          <label>
-            Content
+            {typeChoice === "custom" && (
+              <input
+                className="custom-type-input"
+                type="text"
+                value={customType}
+                onChange={(e) => setCustomType(e.target.value)}
+                placeholder="Type any string (or leave blank to omit)"
+              />
+            )}
+          </div>
+
+          {/* ── Body ── */}
+          <div className="field">
+            <label className="field-label">
+              Message body
+              <span className="field-note">
+                Edit freely — use invalid JSON to trigger DLQ retry
+              </span>
+            </label>
             <textarea
-              name="content"
-              value={form.content}
-              onChange={onChange}
-              placeholder="Your message…"
-              rows={4}
-              required
+              className="body-textarea"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={7}
+              spellCheck={false}
             />
-          </label>
-
-          <label>Type</label>
-          <div className="radio-group">
-            {["good", "bad"].map((t) => (
-              <label key={t} className="radio-label">
-                <input
-                  type="radio"
-                  name="type"
-                  value={t}
-                  checked={form.type === t}
-                  onChange={onChange}
-                />
-                <span className={`badge ${t}`}>{t}</span>
-              </label>
-            ))}
           </div>
 
           <button type="submit" disabled={status === STATUS.sending}>
-            {status === STATUS.sending ? "Sending…" : "Send Message"}
+            {status === STATUS.sending ? "Sending…" : "Send to SQS"}
           </button>
         </form>
 
         {banner && <div className={banner.cls}>{banner.msg}</div>}
 
-        <details className="info">
-          <summary>How it works</summary>
-          <ul>
-            <li>
-              <code>type=good</code> → stored in DynamoDB
-            </li>
-            <li>
-              <code>type=bad</code> → email alert via SNS
-            </li>
-            <li>
-              Requests go <code>/api/messages</code> → CloudFront → API Gateway
-              → SQS
-            </li>
-          </ul>
-        </details>
+        {/* ── Scenario guide ── */}
+        <div className="scenarios">
+          <p className="scenarios-title">Test scenarios</p>
+          <div className="scenario-row">
+            <span className="pill green">type=good</span>
+            <span>+ valid JSON body → stored in DynamoDB</span>
+          </div>
+          <div className="scenario-row">
+            <span className="pill red">type=bad</span>
+            <span>+ any body → email alert via SNS</span>
+          </div>
+          <div className="scenario-row">
+            <span className="pill yellow">type=other</span>
+            <span>+ any body → email alert via SNS (invalid type path)</span>
+          </div>
+          <div className="scenario-row">
+            <span className="pill green">type=good</span>
+            <span>
+              + <strong>invalid JSON body</strong> → Step Function fails → retried
+              2× → DLQ → email (~60s)
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

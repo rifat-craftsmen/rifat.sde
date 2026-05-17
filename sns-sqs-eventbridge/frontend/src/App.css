@@ -25,7 +25,7 @@ body {
   border-radius: 12px;
   padding: 2rem;
   width: 100%;
-  max-width: 480px;
+  max-width: 560px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
@@ -37,8 +37,9 @@ h1 {
 }
 
 .subtitle {
-  font-size: 0.85rem;
-  color: #94a3b8;
+  font-size: 0.8rem;
+  color: #64748b;
+  font-family: monospace;
   margin-bottom: 1.75rem;
 }
 
@@ -48,74 +49,124 @@ form {
   gap: 1.25rem;
 }
 
-label {
+/* ── Field ─────────────────────────────────────────────────────────── */
+.field {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #cbd5e1;
+  gap: 0.5rem;
 }
 
-input[type="number"],
-textarea {
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.field-note {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #64748b;
+}
+
+/* ── Type card grid ─────────────────────────────────────────────────── */
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.type-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.type-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.type-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.type-hint {
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+/* colour variants */
+.type-card.green       { background: #052e16; }
+.type-card.green .type-name { color: #86efac; }
+.type-card.green .type-hint { color: #4ade80; opacity: 0.8; }
+.type-card.green.selected,
+.type-card.green:hover  { border-color: #16a34a; }
+
+.type-card.red         { background: #450a0a; }
+.type-card.red .type-name { color: #fca5a5; }
+.type-card.red .type-hint { color: #f87171; opacity: 0.8; }
+.type-card.red.selected,
+.type-card.red:hover    { border-color: #dc2626; }
+
+.type-card.yellow      { background: #422006; }
+.type-card.yellow .type-name { color: #fcd34d; }
+.type-card.yellow .type-hint { color: #fbbf24; opacity: 0.8; }
+.type-card.yellow.selected,
+.type-card.yellow:hover { border-color: #d97706; }
+
+/* ── Custom type input ──────────────────────────────────────────────── */
+.custom-type-input {
   background: #0f172a;
   border: 1px solid #334155;
   border-radius: 6px;
-  color: #f1f5f9;
-  font-size: 0.95rem;
-  padding: 0.6rem 0.75rem;
+  color: #fcd34d;
+  font-family: monospace;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
   outline: none;
+  width: 100%;
   transition: border-color 0.2s;
+}
+
+.custom-type-input:focus {
+  border-color: #d97706;
+}
+
+/* ── Body textarea ──────────────────────────────────────────────────── */
+.body-textarea {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #94a3b8;
+  font-family: monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  padding: 0.75rem;
+  outline: none;
   width: 100%;
   resize: vertical;
+  transition: border-color 0.2s;
 }
 
-input[type="number"]:focus,
-textarea:focus {
+.body-textarea:focus {
   border-color: #6366f1;
+  color: #e2e8f0;
 }
 
-.radio-group {
-  display: flex;
-  gap: 1rem;
-  margin-top: 0.25rem;
-}
-
-.radio-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-weight: 400;
-  flex-direction: row;
-}
-
-.radio-label input[type="radio"] {
-  accent-color: #6366f1;
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-
-.badge {
-  padding: 0.2rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-}
-
-.badge.good {
-  background: #14532d;
-  color: #86efac;
-}
-
-.badge.bad {
-  background: #7f1d1d;
-  color: #fca5a5;
-}
-
+/* ── Submit button ──────────────────────────────────────────────────── */
 button[type="submit"] {
   background: #6366f1;
   color: #fff;
@@ -126,7 +177,6 @@ button[type="submit"] {
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s, opacity 0.2s;
-  margin-top: 0.25rem;
 }
 
 button[type="submit"]:hover:not(:disabled) {
@@ -138,51 +188,59 @@ button[type="submit"]:disabled {
   cursor: not-allowed;
 }
 
+/* ── Status banner ──────────────────────────────────────────────────── */
 .banner {
-  margin-top: 1.25rem;
-  padding: 0.7rem 1rem;
+  margin-top: 1rem;
+  padding: 0.65rem 1rem;
   border-radius: 6px;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 500;
 }
 
-.banner.ok {
-  background: #14532d;
-  color: #86efac;
-}
+.banner.ok  { background: #052e16; color: #86efac; }
+.banner.err { background: #450a0a; color: #fca5a5; }
 
-.banner.err {
-  background: #7f1d1d;
-  color: #fca5a5;
-}
-
-.info {
+/* ── Scenario guide ─────────────────────────────────────────────────── */
+.scenarios {
   margin-top: 1.5rem;
-  border-top: 1px solid #334155;
-  padding-top: 1rem;
+  border-top: 1px solid #1e293b;
+  padding-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
-.info summary {
-  font-size: 0.8rem;
-  color: #94a3b8;
-  cursor: pointer;
-  user-select: none;
+.scenarios-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #475569;
+  margin-bottom: 0.25rem;
 }
 
-.info ul {
-  margin-top: 0.75rem;
-  padding-left: 1.25rem;
-  font-size: 0.8rem;
-  color: #94a3b8;
-  line-height: 1.8;
-}
-
-.info code {
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 3px;
-  padding: 0.1rem 0.35rem;
-  font-family: monospace;
+.scenario-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
   font-size: 0.78rem;
-  color: #a5b4fc;
+  color: #94a3b8;
+  line-height: 1.5;
 }
+
+.scenario-row strong {
+  color: #cbd5e1;
+}
+
+.pill {
+  flex-shrink: 0;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-family: monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.pill.green  { background: #052e16; color: #86efac; }
+.pill.red    { background: #450a0a; color: #fca5a5; }
+.pill.yellow { background: #422006; color: #fcd34d; }

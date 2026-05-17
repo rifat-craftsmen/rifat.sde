@@ -2,7 +2,7 @@
 aws_region     = "ap-southeast-1"  # Singapore region
 project_name   = "trainee-rifat-message-processor"  # All resources will have this prefix
 environment    = "dev"
-admin_email    = "your-email@example.com"  # REQUIRED: Update this
+admin_email    = "rifat.ahmed@craftsmensoftware.com"
 
 # SQS Configuration
 sqs_visibility_timeout = 30  # Messages are retried after 30 seconds

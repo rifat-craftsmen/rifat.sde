@@ -53,12 +53,18 @@ resource "aws_api_gateway_resource" "messages" {
   path_part   = "messages"
 }
 
-# POST /api/messages
+# POST /api/messages?type=<value>
+# type is passed as a query param so it maps to the SQS message attribute
+# independently of the body, which can be any content (including non-JSON).
 resource "aws_api_gateway_method" "post_message" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.messages.id
   http_method   = "POST"
   authorization = "NONE"
+
+  request_parameters = {
+    "method.request.querystring.type" = false
+  }
 }
 
 # ── Integration: POST /api/messages → SQS SendMessage ─────────────────────────
@@ -80,8 +86,10 @@ resource "aws_api_gateway_integration" "sqs" {
   }
 
   request_templates = {
+    # type is read from the query string (?type=good) so the body can be
+    # any content — including non-JSON — enabling the DLQ retry scenario.
     "application/json" = trimspace(<<-EOT
-      Action=SendMessage&QueueUrl=$util.urlEncode("${aws_sqs_queue.main.url}")&MessageBody=$util.urlEncode($input.body)&MessageAttribute.1.Name=type&MessageAttribute.1.Value.DataType=String&MessageAttribute.1.Value.StringValue=$util.urlEncode($input.path('$.type'))
+      Action=SendMessage&QueueUrl=$util.urlEncode("${aws_sqs_queue.main.url}")&MessageBody=$util.urlEncode($input.body)&MessageAttribute.1.Name=type&MessageAttribute.1.Value.DataType=String&MessageAttribute.1.Value.StringValue=$util.urlEncode($input.params('type'))
     EOT
     )
   }
@@ -117,14 +125,13 @@ resource "aws_api_gateway_integration_response" "sqs_200" {
 resource "aws_api_gateway_deployment" "main" {
   rest_api_id = aws_api_gateway_rest_api.main.id
 
-  # Force redeployment when any route or integration changes
+  # Hash actual content (not just IDs) so any VTL or method change triggers redeploy
   triggers = {
     redeployment = sha1(jsonencode([
-      aws_api_gateway_resource.api.id,
-      aws_api_gateway_resource.messages.id,
-      aws_api_gateway_method.post_message.id,
-      aws_api_gateway_integration.sqs.id,
-      aws_api_gateway_integration_response.sqs_200.id,
+      aws_api_gateway_integration.sqs.uri,
+      aws_api_gateway_integration.sqs.request_templates,
+      aws_api_gateway_integration.sqs.request_parameters,
+      aws_api_gateway_method.post_message.request_parameters,
     ]))
   }
 
