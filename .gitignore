@@ -1,6 +1,11 @@
 node_modules
 gacp.sh
 exp/
-meal-planner-task2/
 .vercel
 .env*.local
+
+form-validation/
+sns-sqs-eventbridge/
+routing-and-security/
+meal-planner-task2/
+react-webapp/
