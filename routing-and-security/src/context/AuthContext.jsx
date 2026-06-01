@@ -2,13 +2,13 @@ import { createContext, useContext, useState } from 'react';
 
 const AuthContext = createContext(null);
 
+const STORAGE_KEY = 'auth_token';
+
 export function AuthProvider({ children }) {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [token, setToken] = useState(null);
-  const [csrfToken, setCsrfToken] = useState(null);
+  const [token, setToken] = useState(() => sessionStorage.getItem(STORAGE_KEY));
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!sessionStorage.getItem(STORAGE_KEY));
 
   // Calls POST /api/login with real credentials.
-  // On success, fetches a CSRF token and stores both in memory.
   // Returns { ok: true } or { ok: false, error: string }.
   const login = async (email, password) => {
     try {
@@ -25,13 +25,8 @@ export function AuthProvider({ children }) {
 
       const { token: jwt } = await res.json();
 
-      // Fetch a CSRF token immediately after login so it is ready for
-      // any subsequent state-changing requests in this session.
-      const csrfRes = await fetch('/api/csrf-token');
-      const { csrfToken: csrf } = await csrfRes.json();
-
+      sessionStorage.setItem(STORAGE_KEY, jwt);
       setToken(jwt);
-      setCsrfToken(csrf);
       setIsLoggedIn(true);
       return { ok: true };
     } catch {
@@ -40,13 +35,13 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    sessionStorage.removeItem(STORAGE_KEY);
     setIsLoggedIn(false);
     setToken(null);
-    setCsrfToken(null);
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, token, csrfToken, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, token, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

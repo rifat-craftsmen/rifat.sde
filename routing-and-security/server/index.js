@@ -21,8 +21,21 @@ app.post('/api/login', (req, res) => {
   return res.status(401).json({ error: 'Invalid credentials' });
 });
 
-// GET /api/csrf-token — issue a new CSRF token and store it server-side
-app.get('/api/csrf-token', (req, res) => {
+// Middleware: verify JWT from Authorization header
+function requireAuth(req, res, next) {
+  const auth = req.headers['authorization'] ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Missing token' });
+  try {
+    jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+// GET /api/csrf-token — issue a new CSRF token; requires valid JWT session
+app.get('/api/csrf-token', requireAuth, (req, res) => {
   const csrfToken = randomUUID();
   csrfTokens.add(csrfToken);
   res.json({ csrfToken });

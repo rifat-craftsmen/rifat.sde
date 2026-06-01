@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 function XSSDemo() {
+  const { token } = useAuth();
   const [vulnerableInput, setVulnerableInput] = useState(
     '<b>Welcome back, Alex</b> <img src=x onerror="alert(\'XSS fired\')" />'
   );
@@ -24,7 +26,9 @@ function XSSDemo() {
 
   const fetchCsrfToken = async () => {
     try {
-      const res = await fetch('/api/csrf-token');
+      const res = await fetch('/api/csrf-token', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
       const { csrfToken } = await res.json();
       setFetchedCsrfToken(csrfToken);
       appendLog(`[server] GET /api/csrf-token -> issued ${csrfToken.slice(0, 8)}…`);
