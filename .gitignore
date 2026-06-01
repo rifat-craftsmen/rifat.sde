@@ -5,3 +5,5 @@ meal-planner-task2/
 async-ui-react-query/
 .vercel/
 .env.local
+form-validation/
+sns-sqs-eventbridge/
