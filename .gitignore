@@ -5,4 +5,7 @@ tech-docs/
 meal-planner-task1/terraform/
 async-ui-react-query/
 .env.local
-.vercel/
+.vercel
+form-validation/
+sns-sqs-eventbridge/
+routing-and-security/

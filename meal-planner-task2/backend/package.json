@@ -14,7 +14,10 @@
     "tables:create": "tsx scripts/createTables.ts",
     "teams:sync": "tsx scripts/syncTeams.ts",
     "users:sync": "tsx scripts/syncUsers.ts",
-    "sync": "npm run teams:sync && npm run users:sync"
+    "sync": "npm run teams:sync && npm run users:sync",
+    "test": "vitest run --config vitest.unit.config.ts",
+    "test:watch": "vitest --config vitest.unit.config.ts",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "keywords": [],
   "author": "",
@@ -36,8 +39,11 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^22.19.17",
+    "@types/supertest": "^6.0.3",
     "esbuild": "^0.25.0",
+    "supertest": "^6.3.4",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
   }
 }
