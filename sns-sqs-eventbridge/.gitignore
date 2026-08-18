@@ -36,5 +36,5 @@ terraform.rc
 .idea/
 .vscode/
 *.iml
-docs/
+xdocs/
 deploy.sh
