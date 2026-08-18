@@ -3,6 +3,9 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './swagger.js';
+
 // Import routes
 import authRoutes from './routes/authRoutes.js';
 import mealRoutes from './routes/mealRoutes.js';
@@ -34,6 +37,8 @@ app.use('/api/admin', adminRoutes);
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Start cron jobs
 startDailyRecordJob();
