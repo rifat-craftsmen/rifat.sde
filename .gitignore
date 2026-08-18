@@ -5,3 +5,4 @@ exp/
 .vercel
 .env.local
 .env*.local
+xdocs/
