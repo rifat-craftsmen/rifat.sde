@@ -1,0 +1,26 @@
+import { Response } from 'express'
+import { AuthRequest } from '../types/index.js'
+import { deleteMealScheduleWithAudit } from '../services/adminService.js'
+
+export async function handleDeleteSchedule(req: AuthRequest, res: Response): Promise<void> {
+  if (req.user!.role !== 'ADMIN') {
+    res.json({ type: 4, data: { content: 'Only admins can delete schedules.', flags: 64 } })
+    return
+  }
+
+  const date = req.user!.platform === 'google'
+    ? (req.body?.message?.argumentText as string ?? '').trim()
+    : (req.body.data?.options as Array<{ name: string; value: string }> ?? []).find(o => o.name === 'date')?.value ?? ''
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    res.json({ type: 4, data: { content: 'Invalid date format. Use YYYY-MM-DD.', flags: 64 } })
+    return
+  }
+
+  try {
+    await deleteMealScheduleWithAudit(date, req.user!.discordId)
+    res.json({ type: 4, data: { content: `Schedule for **${date}** deleted.`, flags: 64 } })
+  } catch (err: any) {
+    res.json({ type: 4, data: { content: err.message ?? 'Failed to delete schedule.', flags: 64 } })
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "meal-planner-task2-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build:discord": "esbuild src/lambda.ts --bundle --packages=external --platform=node --target=node22 --outfile=dist/discordLambda.js",
+    "build:cron": "esbuild src/jobs/cronLambda.ts --bundle --packages=external --platform=node --target=node22 --outfile=dist/cron.js",
+    "build:google": "esbuild src/googleLambda.ts --bundle --packages=external --platform=node --target=node22 --outfile=dist/googleLambda.js",
+    "build:discord-authorizer": "esbuild src/authorizers/discordAuthorizer.ts --bundle --packages=external --platform=node --target=node22 --outfile=dist/discordAuthorizer.js",
+    "build": "npm run build:discord && npm run build:cron && npm run build:google && npm run build:discord-authorizer",
+    "tables:create": "tsx scripts/createTables.ts",
+    "teams:sync": "tsx scripts/syncTeams.ts",
+    "users:sync": "tsx scripts/syncUsers.ts",
+    "sync": "npm run teams:sync && npm run users:sync",
+    "test": "vitest run --config vitest.unit.config.ts",
+    "test:watch": "vitest --config vitest.unit.config.ts",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "@vendia/serverless-express": "^4.0.2",
+    "cors": "^2.8.6",
+    "date-fns": "^4.1.0",
+    "discord-interactions": "^3.4.0",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "express-validator": "^7.3.1",
+    "google-auth-library": "^10.6.1",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.19.17",
+    "@types/supertest": "^6.0.3",
+    "esbuild": "^0.25.0",
+    "supertest": "^6.3.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}

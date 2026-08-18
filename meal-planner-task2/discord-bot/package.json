@@ -1,0 +1,22 @@
+{
+  "name": "meal-planner-task2-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord slash command deployer for the meal planner",
+  "type": "module",
+  "scripts": {
+    "deploy-commands": "tsx src/deploy-commands.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/rest": "^2.4.3",
+    "discord-api-types": "^0.37.119",
+    "dotenv": "^17.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.13",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
